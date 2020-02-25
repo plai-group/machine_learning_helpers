@@ -7,15 +7,6 @@ from string import Template
 # Tags to be filled dynamically
 # within job_submitter
 ########################
-# pip install --no-index --upgrade pip
-# pip install --no-index tensorflow
-# pip install --no-index torch
-# pip install sacred
-# pip install pymongo
-# pip install scikit_learn
-# pip install tqdm
-# pip install imbalanced-learn
-
 
 QUEUE_TAG = "$queue"
 MEM_TAG = "$mem"
@@ -24,7 +15,7 @@ GPU_TAG = "$gpu"
 VIRTUAL_ENV_TAG = "$env"
 ACCOUNT_TAG="$account"
 PYTHON_INIT_TAG="$init"
-PYTHON_COMMAND_TAG = "${PYTHON_COMMAND}" #filled in by submission script
+PYTHON_COMMAND_TAG = "$python_command"
 
 ########################
 # tokens to be used whereever
@@ -43,7 +34,23 @@ UBC_SLURM_ACCOUNT_TOKEN = '#SBATCH --partition=plai'
 PBS_GPU_TOKEN = '#PBS -l gpus=1'
 SLURM_GPU_TOKEN = '#SBATCH --gres=gpu:1'
 
-CC_DEFAULT_PYTHON_INIT_TOKEN = f'''
+CC_DEFAULT_PYTHON_INIT_GPU_TOKEN = f'''
+module load python/3.6
+virtualenv --no-download $SLURM_TMPDIR/env
+source $SLURM_TMPDIR/env/bin/activate
+pip install --no-index --upgrade pip
+pip install -r /home/vadmas/dev/envs/{VIRTUAL_ENV_TAG}_gpu.txt
+
+echo "Virutalenv created "
+'''
+
+UBC_DEFAULT_PYTHON_INIT_TOKEN = f'source /ubc/cs/research/fwood/vadmas/miniconda3/bin/activate {VIRTUAL_ENV_TAG}'
+
+
+# hack for cc
+CC_PYTHON_INIT = {}
+
+CC_PYTHON_INIT['ml3'] = f'''
 module load python/3.6
 virtualenv --no-download $SLURM_TMPDIR/env
 source $SLURM_TMPDIR/env/bin/activate
@@ -53,7 +60,23 @@ pip install -r /home/vadmas/dev/envs/{VIRTUAL_ENV_TAG}.txt
 echo "Virutalenv created "
 '''
 
-UBC_DEFAULT_PYTHON_INIT_TOKEN = f'source /ubc/cs/research/fwood/vadmas/miniconda3/bin/activate {VIRTUAL_ENV_TAG}'
+CC_PYTHON_INIT['vodasafe'] = f'''
+module load python/3.6
+virtualenv --no-download $SLURM_TMPDIR/env
+source $SLURM_TMPDIR/env/bin/activate
+pip install --no-index --upgrade pip
+pip install --no-index tensorflow_cpu
+pip install --no-index torch
+pip install sacred
+pip install pymongo
+pip install scikit_learn
+pip install tqdm
+pip install imbalanced-learn
+
+echo "Virutalenv created "
+'''
+
+
 
 ########################
 # templates
@@ -63,6 +86,7 @@ SLURM_HEADER = f'''
 #SBATCH --mem={MEM_TAG}
 #SBATCH --time=00-{HRS_TAG}:00
 #SBATCH --output=%x-%j.out
+#SBATCH --cpus-per-task=16
 {ACCOUNT_TAG}
 {GPU_TAG}'''
 
@@ -82,8 +106,8 @@ echo "Starting run at: `/bin/date`"
 {PYTHON_INIT_TAG}
 
 echo "Running python command:"
-echo {PYTHON_COMMAND_TAG}
-eval {PYTHON_COMMAND_TAG}
+echo "{PYTHON_COMMAND_TAG}"
+{PYTHON_COMMAND_TAG}
 
 echo "Ending run at: `/bin/date`"
 echo 'Job complete!'
@@ -131,15 +155,3 @@ METRIC_FILTER_NO_TIMESTAMP = {'name': 1,
                               "_id": False}
 
 FILTER_ARTIFACTS = {"artifacts": True}
-
-DEFAULT_COLUMNS = ["captured_out",
-                   "data_dir",
-                   "checkpoint",
-                   "checkpoint_frequency",
-                   "cuda",
-                   "__doc__",
-                   "model_dir",
-                   'test_during_training',
-                   'test_frequency',
-                   'train_only',
-                   'heartbeat']

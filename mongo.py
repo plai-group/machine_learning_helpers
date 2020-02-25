@@ -8,7 +8,7 @@ from incense import ExperimentLoader
 from pathlib import Path
 import janitor
 import gridfs
-from static import DEFAULT_FILTER, DEFAULT_COLUMNS, DEFAULT_COLUMNS, METRIC_FILTER, METRIC_FILTER_NO_TIMESTAMP, FILTER_ARTIFACTS
+from static import DEFAULT_FILTER, METRIC_FILTER, METRIC_FILTER_NO_TIMESTAMP, FILTER_ARTIFACTS
 
 cache_location = Path('/Users/vmasrani/.joblib_cache')
 memory = Memory(cache_location, verbose=0)
@@ -61,9 +61,6 @@ def get_experiments(query, exps_only=False, drop_defaults=True, **kwargs):
             .reorder_columns(config_cols)
             .rename_columns({"host.hostname":"hostname"})
             .rename_columns({c: c.replace("config.", "") for c in config_cols}))
-
-    if drop_defaults:
-        exps = exps.remove_columns(DEFAULT_COLUMNS)
 
     if exps_only:
         return exps

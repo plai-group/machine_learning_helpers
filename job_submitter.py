@@ -41,10 +41,8 @@ else:
 
 # if host is UBC
 if HOST == static.UBC_TOKEN:
-    PYTHON_INIT_TOKEN = static.UBC_DEFAULT_PYTHON_INIT_TOKEN
     SLURM_ACCOUNT_TOKEN = static.UBC_SLURM_ACCOUNT_TOKEN
 else:
-    PYTHON_INIT_TOKEN = static.CC_DEFAULT_PYTHON_INIT_TOKEN
     SLURM_ACCOUNT_TOKEN = static.CC_SLURM_ACCOUNT_TOKEN
 
 
@@ -54,7 +52,6 @@ EXPERIMENT_DIR = ""
 SRC_PATH    = ""
 DATA_DIR    = ""
 RESULTS_DIR = ""
-MODEL_DIR   = ""
 
 SLEEP_TIME=0.25
 
@@ -63,12 +60,15 @@ SLEEP_TIME=0.25
 ########################
 
 def submit(hyper_params, experiment_name, experiment_dir,  **kwargs):
-
-    # Validate Arguments and create bash script
+    # Validate arguments
     verify_dirs(experiment_dir, experiment_name)
 
     # Init
-    gpu, hrs, mem, queue, env = make_bash_script(**kwargs)
+    gpu   = kwargs.get('gpu',True)
+    hrs   = kwargs.get('hrs',1)
+    mem   = kwargs.get('mem',"12400M")
+    queue = kwargs.get('queue','gpu')
+    env   = kwargs.get('env','ml3')
 
     # Display info
     hypers = process_hyperparameters(hyper_params)
@@ -86,22 +86,15 @@ def submit(hyper_params, experiment_name, experiment_dir,  **kwargs):
     pprint(hyper_params)
     print("-------({} runs)-------".format(len(hypers)))
 
-    # Submit
-    _submit_jobs(hypers, experiment_name)
-
-
-def _submit_jobs(hypers, experiment_name):
-    # Submit
     ask = True
+
     for idx, hyper_string in enumerate(hypers):
-        python_command = make_python_command(hyper_string, experiment_name)
-        command = make_scheduler_command(python_command, hyper_string, experiment_name, idx)
-
         if ask:
-            flag = input("Submit ({}/{}): {}? (y/n/all/exit) ".format(idx + 1, len(hypers), python_command))
-
+            flag = input("Submit ({}/{}): {}? (y/n/all/exit) ".format(idx + 1, len(hypers), hyper_string))
         if flag in ['yes', 'all', 'y', 'a']:
-            output = subprocess.check_output(command,  stderr=subprocess.STDOUT, shell=True)
+            scheduler_command, python_command = make_commands(hyper_string, experiment_name, idx)
+            make_bash_script(python_command, gpu, hrs, mem, queue, env)
+            output = subprocess.check_output(scheduler_command,  stderr=subprocess.STDOUT, shell=True)
             print("Submitting ({}/{}): {}".format(idx + 1, len(hypers), output.strip().decode()))
 
         if flag in ['all', 'a']:
@@ -113,7 +106,7 @@ def _submit_jobs(hypers, experiment_name):
 
 
 ########################
-# ---- Verifiers ------
+# ---- path management -
 ########################
 
 # Strictly enforce directory structure
@@ -130,10 +123,6 @@ def verify_dirs(experiment_dir, experiment_name):
     now = datetime.datetime.now()
 
     results_dir = experiment_dir / 'results' / experiment_name / now.strftime("%Y_%m_%d_%H:%M:%S")
-    models_dir  = results_dir / 'models'
-
-    results_dir.mkdir(exist_ok=True, parents=True)
-    models_dir.mkdir(exist_ok=True, parents=True)
 
     # make global
     global PROJECT_DIR
@@ -141,8 +130,7 @@ def verify_dirs(experiment_dir, experiment_name):
     global SRC_PATH
     global DATA_DIR
     global RESULTS_DIR
-    global MODEL_DIR
-    PROJECT_DIR, EXPERIMENT_DIR, SRC_PATH, DATA_DIR, RESULTS_DIR, MODEL_DIR = project_dir, experiment_dir, src_path, data_dir, results_dir, models_dir
+    PROJECT_DIR, EXPERIMENT_DIR, SRC_PATH, DATA_DIR, RESULTS_DIR = project_dir, experiment_dir, src_path, data_dir, results_dir
 
 
 def job_name_to_hyper_string(failed_job_names):
@@ -156,40 +144,9 @@ def job_name_to_hyper_string(failed_job_names):
     return [process(name) for name in failed_job_names]
 
 
-#########################
-# ------- Makers --------
-#########################
-
-def make_bash_script(**kwargs):
-    gpu   = kwargs.get('gpu',True)
-    hrs   = kwargs.get('hrs',1)
-    mem   = kwargs.get('mem',"12400M")
-    queue = kwargs.get('queue','gpu')
-    env   = kwargs.get('env','ml3')
-
-    if not gpu: GPU_TOKEN = ''
-    init = Template(PYTHON_INIT_TOKEN).safe_substitute(env=env)
-
-    if SCHEDULER == static.PBS_TOKEN:
-        template = static.PBS_TEMPLATE.safe_substitute(hrs=hrs,
-                                                       mem=mem,
-                                                       init=init,
-                                                       queue=queue,
-                                                       gpu=GPU_TOKEN)
-    else:
-        template = static.SLURM_TEMPLATE.safe_substitute(hrs=hrs,
-                                                         mem=mem,
-                                                         init=init,
-                                                         queue=queue,
-                                                         gpu=GPU_TOKEN,
-                                                         account=SLURM_ACCOUNT_TOKEN)
-
-
-    with open(static.BASH_FILE_NAME_TOKEN, 'w') as rsh:
-        rsh.write(template)
-
-    return gpu, hrs, mem, queue, env
-
+#################################
+# ------- hyperparameters -------
+#################################
 
 def process_hyperparameters(hyper_params):
     if isinstance(hyper_params, dict):
@@ -212,43 +169,73 @@ def make_hyper_string_from_dict(hyper_dict):
 
     commands = []
     for args in itertools.product(*hyper_dict.values()):
-        command = "".join(["{}={} ".format(k, v) for k, v in zip(hyper_dict.keys(), args)])
+        command = "".join(["'{}={}' ".format(k, v) for k, v in zip(hyper_dict.keys(), args)])
         commands.append(command[:-1])
 
     return commands
 
+def make_bash_script(python_command, gpu, hrs, mem, queue, env):
 
-def make_python_command(hyper_string, experiment_name):
-    return ("python {src_path} with "
-            "data_dir={data_dir} "
-            "model_dir={model_dir} "
-            "{hyper_string} "
-            "-p --name {experiment_name}").format(
-                src_path=SRC_PATH,
-                data_dir=DATA_DIR,
-                model_dir=MODEL_DIR,
-                hyper_string=hyper_string,
-                experiment_name=experiment_name)
+    # if host is UBC
+    if HOST == static.UBC_TOKEN:
+        PYTHON_INIT_TOKEN = static.UBC_DEFAULT_PYTHON_INIT_TOKEN
+    else:
+        PYTHON_INIT_TOKEN = static.CC_PYTHON_INIT[env]
+
+    gpu_token = GPU_TOKEN if gpu else ''
+
+    init = Template(PYTHON_INIT_TOKEN).safe_substitute(env=env)
+
+    if SCHEDULER == static.PBS_TOKEN:
+        template = static.PBS_TEMPLATE.safe_substitute(hrs=hrs,
+                                                       mem=mem,
+                                                       init=init,
+                                                       queue=queue,
+                                                       python_command=python_command,
+                                                       gpu=gpu_token)
+    else:
+        template = static.SLURM_TEMPLATE.safe_substitute(hrs=hrs,
+                                                         mem=mem,
+                                                         init=init,
+                                                         queue=queue,
+                                                         python_command=python_command,
+                                                         gpu=gpu_token,
+                                                         account=SLURM_ACCOUNT_TOKEN)
+
+    with open(static.BASH_FILE_NAME_TOKEN, 'w') as rsh:
+        rsh.write(template)
+
+    return gpu, hrs, mem, queue, env
 
 
-def make_scheduler_command(python_command, hyper_string, experiment_name, job_idx):
+
+def make_commands(hyper_string, experiment_name, job_idx):
+
     job_dir = Path(RESULTS_DIR) / f"job_{job_idx}"
-    job_dir.mkdir(exist_ok=False, parents=False)
+    job_dir.mkdir(exist_ok=False, parents=True)
+
+    model_dir = job_dir / 'models'
+    model_dir.mkdir(exist_ok=False, parents=True)
+
+    python_command = f"python {SRC_PATH} with data_dir={DATA_DIR} model_dir={model_dir} {hyper_string} -p --name {experiment_name}"
+
+    if HOST == static.CC_TOKEN:
+        python_command = f"{python_command} -F {RESULTS_DIR}/file_storage_observer"
 
     args_file_name = job_dir / "args.txt"
     res_name = job_dir / 'results.res'
     err_name = job_dir / 'error.err'
 
     with open(args_file_name, 'w') as rsh:
-        rsh.write(hyper_string)
+        rsh.write(hyper_string.replace("' '", "'\n'"))
 
     if SCHEDULER == static.SLURM_TOKEN:
-        command = (f"sbatch -o {res_name} -e {err_name} "
+        scheduler_command = (f"sbatch -o {res_name} -e {err_name} "
                    f"-J {experiment_name} "
-                   f"--export=ALL,PYTHON_COMMAND=\"{python_command}\" {static.BASH_FILE_NAME_TOKEN}")
+                   f"--export=ALL {static.BASH_FILE_NAME_TOKEN}")
     else:
-        command = (f"qsub -o {res_name} -e {err_name} "
+        scheduler_command = (f"qsub -o {res_name} -e {err_name} "
                    f"-N {experiment_name} "
                    f"-d {PROJECT_DIR} "
-                   f"-v PYTHON_COMMAND=\"{python_command}\" {static.BASH_FILE_NAME_TOKEN}")
-    return command
+                   f" {static.BASH_FILE_NAME_TOKEN}")
+    return scheduler_command, python_command
