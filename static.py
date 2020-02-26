@@ -9,12 +9,13 @@ from string import Template
 ########################
 
 QUEUE_TAG = "$queue"
-MEM_TAG = "$mem"
-HRS_TAG = "$hrs"
-GPU_TAG = "$gpu"
-VIRTUAL_ENV_TAG = "$env"
-ACCOUNT_TAG="$account"
-PYTHON_INIT_TAG="$init"
+MEM_TAG   = "$mem"
+HRS_TAG   = "$hrs"
+GPU_TAG   = "$gpu"
+CPU_TAG   = "$cpu"
+ACCOUNT_TAG        = "$account"
+PYTHON_INIT_TAG    = "$init"
+VIRTUAL_ENV_TAG    = "$env"
 PYTHON_COMMAND_TAG = "$python_command"
 
 ########################
@@ -73,7 +74,7 @@ pip install scikit_learn
 pip install tqdm
 pip install imbalanced-learn
 
-echo "Virutalenv created "
+echo "Virtualenv created "
 '''
 
 
@@ -86,7 +87,7 @@ SLURM_HEADER = f'''
 #SBATCH --mem={MEM_TAG}
 #SBATCH --time=00-{HRS_TAG}:00
 #SBATCH --output=%x-%j.out
-#SBATCH --cpus-per-task=16
+#SBATCH --cpus-per-task={CPU_TAG}
 {ACCOUNT_TAG}
 {GPU_TAG}'''
 

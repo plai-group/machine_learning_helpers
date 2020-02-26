@@ -9,6 +9,7 @@ import random
 from joblib import Parallel, delayed
 import joblib
 from pathlib import Path
+import json
 
 persist_dir = Path('./.persistdir')
 
@@ -575,6 +576,35 @@ def ess(log_weight):
 
     return torch.exp(log_ess(log_weight))
 
+def get_experiments_from_fs(path):
+    assert (path / '_resources/').exists() & (path / '_sources/').exists(), f"Bad path: {path}"
+    exps = {}
+    dfs = []
 
-if __name__ == "__main__":
-    print("hi")
+    for job in path.glob("*"):
+        if job.parts[-1] in ['_resources', '_sources']:
+            continue
+        job_id = job.parts[-1]
+        run = job / 'run.json'
+        config = job / 'config.json'
+        with open(run) as data_file:
+            run = json.load(data_file)
+        with open(config) as data_file:
+            config = json.load(data_file)
+        exps[job_id] = {**config, **run}
+
+        metrics = job / 'metrics.json'
+        with open(metrics) as data_file:
+            metrics = json.load(data_file)
+        if metrics:
+            for metric,v in metrics.items():
+                df = pd.DataFrame(v)
+                df.index = pd.MultiIndex.from_product([[job_id], [metric], df.index], names=['_id', 'metric', 'index'])
+                dfs += [df]
+
+
+    exps = pd.DataFrame(exps).T
+    pd.DataFrame(exps).index.name = '_id'
+    df = pd.concat(dfs).drop('timestamps',axis=1)
+
+    return exps, df

@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 import os
 from string import Template
-import subprocess
 import time
 import datetime
 from pprint import pprint
@@ -12,6 +11,7 @@ from itertools import chain
 import static
 import socket
 import subprocess
+
 
 # Global Arguments
 COMPUTE_CANADA_HOSTS = ['cedar{}.cedar.computecanada.ca'.format(i) for i in range(10)]
@@ -65,6 +65,7 @@ def submit(hyper_params, experiment_name, experiment_dir,  **kwargs):
 
     # Init
     gpu   = kwargs.get('gpu',True)
+    cpu   = kwargs.get('cpu',1)
     hrs   = kwargs.get('hrs',1)
     mem   = kwargs.get('mem',"12400M")
     queue = kwargs.get('queue','gpu')
@@ -75,6 +76,7 @@ def submit(hyper_params, experiment_name, experiment_dir,  **kwargs):
 
     print("------Scheduler Options------")
     print(f"gpu: {gpu}")
+    print(f"cpu: {cpu}")
     print(f"hrs: {hrs}")
     print(f"mem: {mem}")
     print(f"queue: {queue}")
@@ -93,7 +95,7 @@ def submit(hyper_params, experiment_name, experiment_dir,  **kwargs):
             flag = input("Submit ({}/{}): {}? (y/n/all/exit) ".format(idx + 1, len(hypers), hyper_string))
         if flag in ['yes', 'all', 'y', 'a']:
             scheduler_command, python_command = make_commands(hyper_string, experiment_name, idx)
-            make_bash_script(python_command, gpu, hrs, mem, queue, env)
+            make_bash_script(python_command, gpu, cpu, hrs, mem, queue, env)
             output = subprocess.check_output(scheduler_command,  stderr=subprocess.STDOUT, shell=True)
             print("Submitting ({}/{}): {}".format(idx + 1, len(hypers), output.strip().decode()))
 
@@ -174,7 +176,7 @@ def make_hyper_string_from_dict(hyper_dict):
 
     return commands
 
-def make_bash_script(python_command, gpu, hrs, mem, queue, env):
+def make_bash_script(python_command, gpu, cpu, hrs, mem, queue, env):
 
     # if host is UBC
     if HOST == static.UBC_TOKEN:
@@ -189,6 +191,7 @@ def make_bash_script(python_command, gpu, hrs, mem, queue, env):
     if SCHEDULER == static.PBS_TOKEN:
         template = static.PBS_TEMPLATE.safe_substitute(hrs=hrs,
                                                        mem=mem,
+                                                       cpu=cpu,
                                                        init=init,
                                                        queue=queue,
                                                        python_command=python_command,
@@ -196,6 +199,7 @@ def make_bash_script(python_command, gpu, hrs, mem, queue, env):
     else:
         template = static.SLURM_TEMPLATE.safe_substitute(hrs=hrs,
                                                          mem=mem,
+                                                         cpu=cpu,
                                                          init=init,
                                                          queue=queue,
                                                          python_command=python_command,

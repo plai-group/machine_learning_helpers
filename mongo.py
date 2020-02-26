@@ -2,7 +2,7 @@ from pymongo import MongoClient
 from db import test_connection, open_ssh, LOCAL_URI, REMOTE_URI, DATABASE_NAME
 import pandas as pd
 import numpy as np
-from pandas.io.json import json_normalize
+from pandas import json_normalize
 from joblib import Memory
 from incense import ExperimentLoader
 from pathlib import Path
