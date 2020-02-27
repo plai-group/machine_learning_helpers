@@ -41,7 +41,7 @@ REQUIRED_OPTIONS = set(["gpu","hrs","cpu","mem","partition","env"])
 # Main submission loop #
 ########################
 
-def submit(hyper_params, experiment_name, experiment_dir, manual_mode=False, **kwargs):
+def submit(hyper_params, experiment_name, experiment_dir, manual_mode=False, file_storage_observer=False, **kwargs):
     # Validate arguments
     # verify_dirs(experiment_dir, experiment_name)
 
@@ -64,7 +64,7 @@ def submit(hyper_params, experiment_name, experiment_dir, manual_mode=False, **k
         if manual_mode:
             path = Path("./manual")
             path.mkdir(exist_ok=True)
-            scheduler_command, python_command = make_commands(hyper_string, experiment_name, idx)
+            scheduler_command, python_command = make_commands(hyper_string, experiment_name, idx, file_storage_observer)
             file_name = static.SUBMISSION_FILE_NAME.replace(".sh", f"{idx}.sh")
             scheduler_command = scheduler_command.replace(static.SUBMISSION_FILE_NAME, file_name)
             make_bash_script(python_command, str(path/file_name), **kwargs)
@@ -180,7 +180,7 @@ def make_bash_script(python_command, file_name, **kwargs):
         rsh.write(file)
 
 
-def make_commands(hyper_string, experiment_name, job_idx):
+def make_commands(hyper_string, experiment_name, job_idx, file_storage_observer):
 
     job_dir = Path(RESULTS_DIR) / f"job_{job_idx}"
     job_dir.mkdir(exist_ok=False, parents=True)
@@ -190,7 +190,7 @@ def make_commands(hyper_string, experiment_name, job_idx):
 
     python_command = f"python {SRC_PATH} with data_dir={DATA_DIR} model_dir={model_dir} {hyper_string} -p --name {experiment_name}"
 
-    if HOST == static.CC:
+    if file_storage_observer:
         python_command = f"{python_command} -F {RESULTS_DIR}/file_storage_observer"
 
     args_file_name = job_dir / "args.txt"
