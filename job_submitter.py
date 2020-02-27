@@ -43,7 +43,7 @@ REQUIRED_OPTIONS = set(["gpu","hrs","cpu","mem","partition","env"])
 
 def submit(hyper_params, experiment_name, experiment_dir, manual_mode=False, file_storage_observer=False, **kwargs):
     # Validate arguments
-    # verify_dirs(experiment_dir, experiment_name)
+    verify_dirs(experiment_dir, experiment_name)
 
     # Display info
     hypers = process_hyperparameters(hyper_params)
@@ -73,7 +73,7 @@ def submit(hyper_params, experiment_name, experiment_dir, manual_mode=False, fil
         if ask:
             flag = input("Submit ({}/{}): {}? (y/n/all/exit) ".format(idx + 1, len(hypers), hyper_string))
         if flag in ['yes', 'all', 'y', 'a']:
-            scheduler_command, python_command = make_commands(hyper_string, experiment_name, idx)
+            scheduler_command, python_command = make_commands(hyper_string, experiment_name, idx, file_storage_observer)
             make_bash_script(python_command, static.SUBMISSION_FILE_NAME, **kwargs)
             output = subprocess.check_output(scheduler_command,  stderr=subprocess.STDOUT, shell=True)
             print("Submitting ({}/{}): {}".format(idx + 1, len(hypers), output.strip().decode()))
