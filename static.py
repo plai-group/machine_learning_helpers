@@ -8,7 +8,8 @@ PARTITION_TOKEN = '#SBATCH --partition=$partition'
 SUBMISSION_FILE_NAME = 'train.sh'
 
 # 'tags' ($cpu, $mem) are filled dynamically in job_submitter
-SLURM_TEMPLATE = f'''
+SLURM_TEMPLATE = f'''#!/bin/bash
+
 {SLURM_GPU_TOKEN}
 #SBATCH --mem=$mem
 #SBATCH --time=00-$hrs:00
