@@ -1,128 +1,65 @@
 from string import Template
 
-# 'tags' are filled dynamically
-# 'tokens' are actual values
-
-################################
-# Tags to be filled dynamically
-# within job_submitter
-########################
-
-QUEUE_TAG = "$queue"
-MEM_TAG   = "$mem"
-HRS_TAG   = "$hrs"
-GPU_TAG   = "$gpu"
-CPU_TAG   = "$cpu"
-ACCOUNT_TAG        = "$account"
-PYTHON_INIT_TAG    = "$init"
-VIRTUAL_ENV_TAG    = "$env"
-PYTHON_COMMAND_TAG = "$python_command"
-
-########################
-# tokens to be used whereever
-########################
-PBS_TOKEN   = 'PBS'
-SLURM_TOKEN = 'SLURM'
-UBC_TOKEN   = 'UBC'
-CC_TOKEN    = 'CC'
-BASH_FILE_NAME_TOKEN    = "train.sh"
-PBS_DEFAULT_QUEUE_TOKEN = "laura"
-PBS_DEFAULT_GPU_QUEUE_TOKEN = "gpu"
-
-CC_SLURM_ACCOUNT_TOKEN = '#SBATCH --account=rrg-kevinlb'
-UBC_SLURM_ACCOUNT_TOKEN = '#SBATCH --partition=plai'
-
-PBS_GPU_TOKEN = '#PBS -l gpus=1'
+UBC = 'ubc'
+CC  = 'cc'
 SLURM_GPU_TOKEN = '#SBATCH --gres=gpu:1'
+RRG_TOKEN       = '#SBATCH --account=rrg-kevinlb'
+PARTITION_TOKEN = '#SBATCH --partition=$partition'
+SUBMISSION_FILE_NAME = 'train.sh'
 
-CC_DEFAULT_PYTHON_INIT_GPU_TOKEN = f'''
-module load python/3.6
-virtualenv --no-download $SLURM_TMPDIR/env
-source $SLURM_TMPDIR/env/bin/activate
-pip install --no-index --upgrade pip
-pip install -r /home/vadmas/dev/envs/{VIRTUAL_ENV_TAG}_gpu.txt
-
-echo "Virutalenv created "
-'''
-
-UBC_DEFAULT_PYTHON_INIT_TOKEN = f'source /ubc/cs/research/fwood/vadmas/miniconda3/bin/activate {VIRTUAL_ENV_TAG}'
-
-
-# hack for cc
-CC_PYTHON_INIT = {}
-
-CC_PYTHON_INIT['ml3'] = f'''
-module load python/3.6
-virtualenv --no-download $SLURM_TMPDIR/env
-source $SLURM_TMPDIR/env/bin/activate
-pip install --no-index --upgrade pip
-pip install -r /home/vadmas/dev/envs/{VIRTUAL_ENV_TAG}.txt
-
-echo "Virutalenv created "
-'''
-
-CC_PYTHON_INIT['vodasafe'] = f'''
-module load python/3.6
-virtualenv --no-download $SLURM_TMPDIR/env
-source $SLURM_TMPDIR/env/bin/activate
-pip install --no-index --upgrade pip
-pip install --no-index tensorflow_cpu
-pip install --no-index torch
-pip install sacred
-pip install pymongo
-pip install scikit_learn
-pip install tqdm
-pip install imbalanced-learn
-
-echo "Virtualenv created "
-'''
-
-
-
-########################
-# templates
-########################
-
-SLURM_HEADER = f'''
-#SBATCH --mem={MEM_TAG}
-#SBATCH --time=00-{HRS_TAG}:00
+# 'tags' ($cpu, $mem) are filled dynamically in job_submitter
+SLURM_TEMPLATE = f'''
+{SLURM_GPU_TOKEN}
+#SBATCH --mem=$mem
+#SBATCH --time=00-$hrs:00
 #SBATCH --output=%x-%j.out
-#SBATCH --cpus-per-task={CPU_TAG}
-{ACCOUNT_TAG}
-{GPU_TAG}'''
+#SBATCH --cpus-per-task=$cpu
+{PARTITION_TOKEN}
+{RRG_TOKEN}
 
-PBS_HEADER = f'''
-#PBS -q {QUEUE_TAG}
-#PBS -V
-#PBS -l walltime={HRS_TAG}:00:00
-#PBS -l mem={MEM_TAG}
-{GPU_TAG}
-'''
-
-BODY = f'''
 # ---------------------------------------------------------------------
 echo "Current working directory: `pwd`"
 echo "Starting run at: `/bin/date`"
 
-{PYTHON_INIT_TAG}
+$init
 
 echo "Running python command:"
-echo "{PYTHON_COMMAND_TAG}"
-{PYTHON_COMMAND_TAG}
+echo "$python_command"
+$python_command
 
 echo "Ending run at: `/bin/date`"
 echo 'Job complete!'
 '''
 
-SLURM_TEMPLATE = Template(f'''#!/bin/bash
-{SLURM_HEADER}
-{BODY}
-''')
+UBC_PYTHON_INIT_TOKEN = f'source /ubc/cs/research/fwood/vadmas/miniconda3/bin/activate $env'
 
-PBS_TEMPLATE = Template(f'''#!/bin/bash
-{PBS_HEADER}
-{BODY}
-''')
+CC_PYTHON_INIT_TOKEN = f'''
+module load python/3.6
+virtualenv --no-download $SLURM_TMPDIR/env
+source $SLURM_TMPDIR/env/bin/activate
+pip install --no-index --upgrade pip
+pip install --no-index joblib sacred pymongo
+$pip_install
+echo "Virutalenv created
+'''
+
+# hack for cc
+CC_PIP_INSTALLS = {}
+
+CC_PIP_INSTALLS['ml3'] = f'''
+pip install --no-index torch
+pip install GPy
+pip install scikit-image
+pip install emukit==0.4.6
+'''
+
+CC_PIP_INSTALLS['vodasafe'] = f'''
+pip install --no-index tensorflow_gpu
+pip install scikit_learn
+pip install tqdm
+pip install imbalanced-learn
+'''
+
 
 #########################
 # ---- MONGO FILTERS ----

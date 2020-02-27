@@ -608,3 +608,6 @@ def get_experiments_from_fs(path):
     df = pd.concat(dfs).drop('timestamps',axis=1)
 
     return exps, df
+
+def process_dictionary_column(df, column_name):
+    return df.drop(column_name, 1).assign(**pd.DataFrame(df[column_name].values.tolist(), index=df.index))

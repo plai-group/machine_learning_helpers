@@ -12,76 +12,47 @@ import static
 import socket
 import subprocess
 
-
 # Global Arguments
 COMPUTE_CANADA_HOSTS = ['cedar{}.cedar.computecanada.ca'.format(i) for i in range(10)]
-UBC_PBS_HOSTS   = ['headnode']
 UBC_SLURM_HOSTS = ['borg.cs.ubc.ca']
 
 hostname = socket.gethostname()
 
 # find host and scheduler
 if hostname in COMPUTE_CANADA_HOSTS:
-    HOST      = static.CC_TOKEN
-    SCHEDULER = static.SLURM_TOKEN
-elif hostname in UBC_PBS_HOSTS:
-    HOST      = static.UBC_TOKEN
-    SCHEDULER = static.PBS_TOKEN
+    HOST      = static.CC
 elif hostname in UBC_SLURM_HOSTS:
-    HOST      = static.UBC_TOKEN
-    SCHEDULER = static.SLURM_TOKEN
+    HOST      = static.UBC
 else:
     raise ValueError("Scheduler not detected")
-
-# if scheduler is PBS
-if SCHEDULER == static.PBS_TOKEN:
-    GPU_TOKEN = static.PBS_GPU_TOKEN
-else:
-    GPU_TOKEN = static.SLURM_GPU_TOKEN
-
-# if host is UBC
-if HOST == static.UBC_TOKEN:
-    SLURM_ACCOUNT_TOKEN = static.UBC_SLURM_ACCOUNT_TOKEN
-else:
-    SLURM_ACCOUNT_TOKEN = static.CC_SLURM_ACCOUNT_TOKEN
-
 
 # Paths
 PROJECT_DIR    = ""
 EXPERIMENT_DIR = ""
-SRC_PATH    = ""
-DATA_DIR    = ""
-RESULTS_DIR = ""
+SRC_PATH       = ""
+DATA_DIR       = ""
+RESULTS_DIR    = ""
 
-SLEEP_TIME=0.25
+SLEEP_TIME = 0.25
+
+REQUIRED_OPTIONS = set(["gpu","hrs","cpu","mem","partition","env"])
 
 ########################
 # Main submission loop #
 ########################
 
-def submit(hyper_params, experiment_name, experiment_dir,  **kwargs):
+def submit(hyper_params, experiment_name, experiment_dir, manual_mode=False, **kwargs):
     # Validate arguments
-    verify_dirs(experiment_dir, experiment_name)
-
-    # Init
-    gpu   = kwargs.get('gpu',True)
-    cpu   = kwargs.get('cpu',1)
-    hrs   = kwargs.get('hrs',1)
-    mem   = kwargs.get('mem',"12400M")
-    queue = kwargs.get('queue','gpu')
-    env   = kwargs.get('env','ml3')
+    # verify_dirs(experiment_dir, experiment_name)
 
     # Display info
     hypers = process_hyperparameters(hyper_params)
 
+    assert set(kwargs.keys()) == REQUIRED_OPTIONS, f"{REQUIRED_OPTIONS} must be specified"
+
     print("------Scheduler Options------")
-    print(f"gpu: {gpu}")
-    print(f"cpu: {cpu}")
-    print(f"hrs: {hrs}")
-    print(f"mem: {mem}")
-    print(f"queue: {queue}")
-    print(f"env: {env}")
-    print("-------({})-------".format(SCHEDULER))
+    pprint(kwargs)
+    print("-----------(SLURM)-----------")
 
     print("Saving results in: {}".format(RESULTS_DIR))
     print("------Sweeping over------")
@@ -89,13 +60,21 @@ def submit(hyper_params, experiment_name, experiment_dir,  **kwargs):
     print("-------({} runs)-------".format(len(hypers)))
 
     ask = True
-
     for idx, hyper_string in enumerate(hypers):
+        if manual_mode:
+            path = Path("./manual")
+            path.mkdir(exist_ok=True)
+            scheduler_command, python_command = make_commands(hyper_string, experiment_name, idx)
+            file_name = static.SUBMISSION_FILE_NAME.replace(".sh", f"{idx}.sh")
+            scheduler_command = scheduler_command.replace(static.SUBMISSION_FILE_NAME, file_name)
+            make_bash_script(python_command, str(path/file_name), **kwargs)
+            print(scheduler_command)
+            continue
         if ask:
             flag = input("Submit ({}/{}): {}? (y/n/all/exit) ".format(idx + 1, len(hypers), hyper_string))
         if flag in ['yes', 'all', 'y', 'a']:
             scheduler_command, python_command = make_commands(hyper_string, experiment_name, idx)
-            make_bash_script(python_command, gpu, cpu, hrs, mem, queue, env)
+            make_bash_script(python_command, static.SUBMISSION_FILE_NAME, **kwargs)
             output = subprocess.check_output(scheduler_command,  stderr=subprocess.STDOUT, shell=True)
             print("Submitting ({}/{}): {}".format(idx + 1, len(hypers), output.strip().decode()))
 
@@ -176,41 +155,29 @@ def make_hyper_string_from_dict(hyper_dict):
 
     return commands
 
-def make_bash_script(python_command, gpu, cpu, hrs, mem, queue, env):
+def make_bash_script(python_command, file_name, **kwargs):
+    file = static.SLURM_TEMPLATE
 
-    # if host is UBC
-    if HOST == static.UBC_TOKEN:
-        PYTHON_INIT_TOKEN = static.UBC_DEFAULT_PYTHON_INIT_TOKEN
+    # if host is UBC remove RRG
+    # if host is cc remove partition
+    if HOST == static.UBC:
+        file = file.replace(static.RRG_TOKEN, "")
+        python_init = Template(static.UBC_PYTHON_INIT_TOKEN).safe_substitute(env=kwargs['env'])
+        file = Template(file).safe_substitute(partition=kwargs['partition'])
     else:
-        PYTHON_INIT_TOKEN = static.CC_PYTHON_INIT[env]
+        file = file.replace(static.PARTITION_TOKEN, "")
+        python_init = Template(static.CC_PYTHON_INIT_TOKEN).safe_substitute(pip_install=static.CC_PIP_INSTALLS[kwargs['env']])
 
-    gpu_token = GPU_TOKEN if gpu else ''
+    file = Template(file).safe_substitute(init=python_init)
 
-    init = Template(PYTHON_INIT_TOKEN).safe_substitute(env=env)
+    if not kwargs['gpu']:
+        file = file.replace(static.SLURM_GPU_TOKEN, '')
+        file = file.replace("_gpu", "")
 
-    if SCHEDULER == static.PBS_TOKEN:
-        template = static.PBS_TEMPLATE.safe_substitute(hrs=hrs,
-                                                       mem=mem,
-                                                       cpu=cpu,
-                                                       init=init,
-                                                       queue=queue,
-                                                       python_command=python_command,
-                                                       gpu=gpu_token)
-    else:
-        template = static.SLURM_TEMPLATE.safe_substitute(hrs=hrs,
-                                                         mem=mem,
-                                                         cpu=cpu,
-                                                         init=init,
-                                                         queue=queue,
-                                                         python_command=python_command,
-                                                         gpu=gpu_token,
-                                                         account=SLURM_ACCOUNT_TOKEN)
+    file = Template(file).safe_substitute(hrs=kwargs['hrs'], mem=kwargs['mem'], cpu=kwargs['cpu'], python_command=python_command)
 
-    with open(static.BASH_FILE_NAME_TOKEN, 'w') as rsh:
-        rsh.write(template)
-
-    return gpu, hrs, mem, queue, env
-
+    with open(file_name, 'w') as rsh:
+        rsh.write(file)
 
 
 def make_commands(hyper_string, experiment_name, job_idx):
@@ -223,7 +190,7 @@ def make_commands(hyper_string, experiment_name, job_idx):
 
     python_command = f"python {SRC_PATH} with data_dir={DATA_DIR} model_dir={model_dir} {hyper_string} -p --name {experiment_name}"
 
-    if HOST == static.CC_TOKEN:
+    if HOST == static.CC:
         python_command = f"{python_command} -F {RESULTS_DIR}/file_storage_observer"
 
     args_file_name = job_dir / "args.txt"
@@ -233,13 +200,6 @@ def make_commands(hyper_string, experiment_name, job_idx):
     with open(args_file_name, 'w') as rsh:
         rsh.write(hyper_string.replace("' '", "'\n'"))
 
-    if SCHEDULER == static.SLURM_TOKEN:
-        scheduler_command = (f"sbatch -o {res_name} -e {err_name} "
-                   f"-J {experiment_name} "
-                   f"--export=ALL {static.BASH_FILE_NAME_TOKEN}")
-    else:
-        scheduler_command = (f"qsub -o {res_name} -e {err_name} "
-                   f"-N {experiment_name} "
-                   f"-d {PROJECT_DIR} "
-                   f" {static.BASH_FILE_NAME_TOKEN}")
+    scheduler_command = f"sbatch -o {res_name} -e {err_name} -J {experiment_name} --export=ALL {static.SUBMISSION_FILE_NAME}"
+
     return scheduler_command, python_command
