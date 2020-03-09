@@ -39,9 +39,10 @@ module load python/3.6
 virtualenv --no-download $SLURM_TMPDIR/env
 source $SLURM_TMPDIR/env/bin/activate
 pip install --no-index --upgrade pip
-pip install --no-index joblib sacred pymongo
+pip install --no-index torch
+pip install joblib sacred pymongo wandb tensorboard
 $pip_install
-echo "Virutalenv created
+echo "Virutalenv created"
 '''
 
 # hack for cc

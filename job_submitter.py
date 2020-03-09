@@ -172,7 +172,7 @@ def make_bash_script(python_command, file_name, **kwargs):
 
     if not kwargs['gpu']:
         file = file.replace(static.SLURM_GPU_TOKEN, '')
-        file = file.replace("_gpu", "")
+        file = file.replace("tensorflow_gpu", "tensorflow_cpu")
 
     file = Template(file).safe_substitute(hrs=kwargs['hrs'], mem=kwargs['mem'], cpu=kwargs['cpu'], python_command=python_command)
 
@@ -190,7 +190,7 @@ def make_commands(hyper_string, experiment_name, job_idx, file_storage_observer)
 
     python_command = f"python {SRC_PATH} with data_dir={DATA_DIR} model_dir={model_dir} {hyper_string} -p --name {experiment_name}"
 
-    if file_storage_observer:
+    if file_storage_observer or (HOST == static.CC):
         python_command = f"{python_command} -F {RESULTS_DIR}/file_storage_observer"
 
     args_file_name = job_dir / "args.txt"
@@ -203,3 +203,4 @@ def make_commands(hyper_string, experiment_name, job_idx, file_storage_observer)
     scheduler_command = f"sbatch -o {res_name} -e {err_name} -J {experiment_name} --export=ALL {static.SUBMISSION_FILE_NAME}"
 
     return scheduler_command, python_command
+
