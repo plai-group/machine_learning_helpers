@@ -19,6 +19,8 @@ import torch.distributed as dist
 
 persist_dir = Path('./.persistdir')
 
+
+# from the excellent https://github.com/pytorch/vision/blob/master/references/detection/utils.py
 class SmoothedValue(object):
     """Track a series of values and provide access to smoothed values over a
     window or the global series average.
@@ -79,6 +81,11 @@ class SmoothedValue(object):
             global_avg=self.global_avg,
             max=self.max,
             value=self.value)
+
+
+def save_model(args):
+    torch.save(args.model.state_dict(),
+               os.path.join(args.wandb.run.dir, "model.h5"))
 
 
 def all_gather(data):
@@ -334,6 +341,7 @@ def init_distributed_mode(args):
     torch.distributed.barrier()
     setup_for_distributed(args.rank == 0)
 
+
 class AverageMeter(object):
     """
     Computes and stores the average, var, and sample_var
@@ -382,6 +390,7 @@ class AverageMeter(object):
             return np.array(list(val.values()))
         else:
             raise ValueError
+
 
 class MovingAverageMeter(object):
     """Computes the  moving average of a given float."""
@@ -623,44 +632,53 @@ class BestMeter(object):
 
         self.mode = mode
 
+
 def hits_and_misses(y_hat, y_testing):
-    tp =  sum(y_hat + y_testing >1)
-    tn =  sum(y_hat + y_testing == 0)
-    fp =  sum(y_hat - y_testing > 0)
-    fn =  sum(y_testing - y_hat > 0)
+    tp = sum(y_hat + y_testing > 1)
+    tn = sum(y_hat + y_testing == 0)
+    fp = sum(y_hat - y_testing > 0)
+    fn = sum(y_testing - y_hat > 0)
     return tp, tn, fp, fn
 
+
 def classification_metrics(tp, tn, fp, fn):
-    precision   = tp /(tp + fp)
-    recall      = tp/(tp + fn)
-    f1          = 2.0*(precision*recall/(precision + recall))
-    sensitivity = tp/(tp + fn)
-    specificity = tn/(tn+fp)
+    precision   = tp / (tp + fp)
+    recall      = tp / (tp + fn)
+    f1          = 2.0 * (precision * recall / (precision + recall))
+    sensitivity = tp / (tp + fn)
+    specificity = tn / (tn + fp)
 
     return {
-        "precision":float(precision),
-        "recall":float(recall),
-        "f1":float(f1),
-        "sensitivity":float(sensitivity),
-        "specificity":float(specificity),
+        "precision": float(precision),
+        "recall": float(recall),
+        "f1": float(f1),
+        "sensitivity": float(sensitivity),
+        "specificity": float(specificity),
     }
 
 # convert whatever to numpy array
+
+
 def numpyify(val):
     if isinstance(val, dict):
-        return {k:np.array(v) for k, v in val.items()}
+        return {k: np.array(v) for k, v in val.items()}
     if isinstance(val, (float, int, list, np.ndarray, torch.Tensor)):
         return np.array(val)
     else:
         raise ValueError("Not handled")
 
 # Disable
+
+
 def block_print():
     sys.stdout = open(os.devnull, 'w')
 
 # Restore
+
+
 def enable_print():
     sys.stdout = sys.__stdout__
+
 
 def get_data_loader(dataset, batch_size, args, shuffle=True):
     """Args:
@@ -895,6 +913,7 @@ def ess(log_weight):
 
     return torch.exp(log_ess(log_weight))
 
+
 def get_experiments_from_fs(path):
     assert (path / '_resources/').exists() & (path / '_sources/').exists(), f"Bad path: {path}"
     exps = {}
@@ -916,20 +935,21 @@ def get_experiments_from_fs(path):
         with open(metrics) as data_file:
             metrics = json.load(data_file)
         if metrics:
-            for metric,v in metrics.items():
+            for metric, v in metrics.items():
                 df = pd.DataFrame(v)
                 df.index = pd.MultiIndex.from_product([[job_id], [metric], df.index], names=['_id', 'metric', 'index'])
                 dfs += [df]
 
-
     exps = pd.DataFrame(exps).T
     pd.DataFrame(exps).index.name = '_id'
-    df = pd.concat(dfs).drop('timestamps',axis=1)
+    df = pd.concat(dfs).drop('timestamps', axis=1)
 
     return exps, df
 
+
 def process_dictionary_column(df, column_name):
     return df.drop(column_name, 1).assign(**pd.DataFrame(df[column_name].values.tolist(), index=df.index))
+
 
 def process_tuple_column(df, column_name, output_column_names):
     return df.drop(column_name, 1).assign(**pd.DataFrame(df[column_name].values.tolist(), index=df.index))
