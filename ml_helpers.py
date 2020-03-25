@@ -18,7 +18,7 @@ import torch
 import torch.distributed as dist
 
 persist_dir = Path('./.persistdir')
-
+nested_dict = lambda: defaultdict(nested_dict)
 
 # from the excellent https://github.com/pytorch/vision/blob/master/references/detection/utils.py
 class SmoothedValue(object):
@@ -254,6 +254,14 @@ class MetricLogger(object):
 def collate_fn(batch):
     return tuple(zip(*batch))
 
+
+def one_vs_all_cv(mylist):
+    folds = []
+    for i in range(len(mylist)):
+        train = mylist.copy()
+        test = [train.pop(i)]
+        folds += [(train, test)]
+    return folds
 
 def warmup_lr_scheduler(optimizer, warmup_iters, warmup_factor):
     def f(x):
@@ -730,7 +738,7 @@ def put(value, filename):
 def get(filename):
     filename = persist_dir / filename
     assert filename.exists(), "{} doesn't exist".format(filename)
-    print("Saving to ", filename)
+    print("Loading from ", filename)
     return joblib.load(filename)
 
 
