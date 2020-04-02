@@ -635,6 +635,14 @@ class BestMeter(object):
 
         self.mode = mode
 
+# https://stackoverflow.com/questions/10823877/what-is-the-fastest-way-to-flatten-arbitrarily-nested-lists-in-python
+def flatten(container):
+    for i in container:
+        if isinstance(i, (list,tuple)):
+            yield from flatten(i)
+        else:
+            yield i
+
 
 def hits_and_misses(y_hat, y_testing):
     tp = sum(y_hat + y_testing > 1)
