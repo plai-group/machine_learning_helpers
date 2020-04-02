@@ -619,14 +619,9 @@ class BestMeter(object):
 
         return False
 
-    @property
-    def in_cooldown(self):
-        return self.cooldown_counter > 0
-
     def is_better(self, a, best):
-        if self.mode == 'min' and self.threshold_mode == 'abs':
+        if self.mode == 'min':
             return a < best
-
         else:  # mode == 'max' and epsilon_mode == 'abs':
             return a > best
 
@@ -670,8 +665,10 @@ def classification_metrics(tp, tn, fp, fn):
 def numpyify(val):
     if isinstance(val, dict):
         return {k: np.array(v) for k, v in val.items()}
-    if isinstance(val, (float, int, list, np.ndarray, torch.Tensor)):
+    if isinstance(val, (float, int, list, np.ndarray)):
         return np.array(val)
+    if isinstance(val, (torch.Tensor)):
+        return val.cpu().numpy()
     else:
         raise ValueError("Not handled")
 

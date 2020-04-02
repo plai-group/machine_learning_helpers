@@ -56,42 +56,5 @@ pip install emukit==0.4.6
 '''
 
 CC_PIP_INSTALLS['vodasafe'] = f'''
-pip install --no-index tensorflow_gpu
-pip install scikit_learn
-pip install tqdm
-pip install imbalanced-learn
+pip install scikit_learn pillow tqdm imbalanced-learn torchvision pycocotools
 '''
-
-
-#########################
-# ---- MONGO FILTERS ----
-#########################
-
-# MONGO FILTERS
-DEFAULT_FILTER = {"_id": 1,
-                  "status": 1,
-                  "config": 1,
-                  "status": 1,
-                  "heartbeat": 1,
-                  "experiment.name": 1,
-                  "comment": 1,
-                  "host.hostname": 1,
-                  "captured_out": 1,
-                  "result": 1,
-                  "stop_time": 1,
-                  "start_time": 1}
-
-METRIC_FILTER = {'name': 1,
-                 'steps': 1,
-                 'timestamps': 1,
-                 'values': 1,
-                 "run_id": 1,
-                 "_id": False}
-
-METRIC_FILTER_NO_TIMESTAMP = {'name': 1,
-                              'steps': 1,
-                              'values': 1,
-                              "run_id": 1,
-                              "_id": False}
-
-FILTER_ARTIFACTS = {"artifacts": True}
