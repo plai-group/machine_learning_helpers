@@ -40,7 +40,7 @@ virtualenv --no-download $SLURM_TMPDIR/env
 source $SLURM_TMPDIR/env/bin/activate
 pip install --no-index --upgrade pip
 pip install --no-index torch
-pip install joblib sacred pymongo wandb tensorboard
+pip install joblib sacred pymongo wandb tensorboard scikit-image sklearn
 $pip_install
 echo "Virutalenv created"
 '''
@@ -52,9 +52,11 @@ CC_PIP_INSTALLS['ml3'] = f'''
 pip install --no-index torch
 pip install GPy
 pip install scikit-image
-pip install emukit==0.4.6
+pip install emukit==0.4.7
 '''
 
 CC_PIP_INSTALLS['vodasafe'] = f'''
 pip install scikit_learn pillow tqdm imbalanced-learn torchvision pycocotools
 '''
+
+

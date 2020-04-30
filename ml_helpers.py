@@ -159,7 +159,7 @@ def reduce_dict(input_dict, average=True):
 
 
 class MetricLogger(object):
-    def __init__(self, delimiter="\t", header='', print_freq=10, wandb=None):
+    def __init__(self, delimiter="\t", header='', print_freq=1, wandb=None):
         self.meters = defaultdict(SmoothedValue)
         self.delimiter = delimiter
         self.print_freq = print_freq
@@ -643,6 +643,11 @@ def flatten(container):
         else:
             yield i
 
+# https://codereview.stackexchange.com/questions/185785/scale-numpy-array-to-certain-range
+def scale(x, out_range=(-1, 1)):
+    domain = np.min(x), np.max(x)
+    y = (x - (domain[1] + domain[0]) / 2) / (domain[1] - domain[0])
+    return y * (out_range[1] - out_range[0]) + (out_range[1] + out_range[0]) / 2
 
 def hits_and_misses(y_hat, y_testing):
     tp = sum(y_hat + y_testing > 1)
