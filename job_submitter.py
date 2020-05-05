@@ -35,15 +35,22 @@ RESULTS_DIR    = ""
 
 SLEEP_TIME = 0.25
 
-REQUIRED_OPTIONS = set(["gpu","hrs","cpu","mem","partition","env"])
+REQUIRED_OPTIONS = set(["gpu", "hrs", "cpu", "mem", "partition", "env"])
 
 ########################
 # Main submission loop #
 ########################
 
-def submit(hyper_params, experiment_name, experiment_dir, manual_mode=False, file_storage_observer=False, **kwargs):
+def submit(hyper_params,
+           experiment_name,
+           experiment_dir,
+           manual_mode=False,
+           file_storage_observer=False,
+           script_name="main.py",
+           **kwargs):
+
     # Validate arguments
-    verify_dirs(experiment_dir, experiment_name)
+    verify_dirs(experiment_dir, experiment_name, script_name)
 
     # Display info
     hypers = process_hyperparameters(hyper_params)
@@ -91,10 +98,10 @@ def submit(hyper_params, experiment_name, experiment_dir, manual_mode=False, fil
 ########################
 
 # Strictly enforce directory structure
-def verify_dirs(experiment_dir, experiment_name):
+def verify_dirs(experiment_dir, experiment_name, script_name):
     experiment_dir = Path(experiment_dir)
     project_dir    = Path(experiment_dir).parents[1]
-    src_path       = Path(project_dir) / 'main.py'
+    src_path       = Path(project_dir) / script_name
     data_dir       = Path(project_dir) / 'data'
 
     assert project_dir.is_dir(), "{} does not exist".format(project_dir)

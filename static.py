@@ -51,8 +51,10 @@ CC_PIP_INSTALLS = {}
 CC_PIP_INSTALLS['ml3'] = f'''
 pip install --no-index torch
 pip install GPy
+pip install pyDOE
 pip install scikit-image
-pip install emukit==0.4.7
+pip install emukit
+pip install tqdm
 '''
 
 CC_PIP_INSTALLS['vodasafe'] = f'''
