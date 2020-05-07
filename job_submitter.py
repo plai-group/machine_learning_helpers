@@ -55,7 +55,7 @@ def submit(hyper_params,
     # Display info
     hypers = process_hyperparameters(hyper_params)
 
-    assert set(kwargs.keys()) == REQUIRED_OPTIONS, f"{REQUIRED_OPTIONS} must be specified"
+    assert REQUIRED_OPTIONS.issubset(set(kwargs.keys())), f"{REQUIRED_OPTIONS} must be specified"
 
     print("------Scheduler Options------")
     pprint(kwargs)
@@ -163,28 +163,67 @@ def make_hyper_string_from_dict(hyper_dict):
     return commands
 
 def make_bash_script(python_command, file_name, **kwargs):
-    file = static.SLURM_TEMPLATE
+    if HOST == static.CC:
+        raise ValueError("Not written for cc yet")
 
-    # if host is UBC remove RRG
-    # if host is cc remove partition
-    if HOST == static.UBC:
-        file = file.replace(static.RRG_TOKEN, "")
-        python_init = Template(static.UBC_PYTHON_INIT_TOKEN).safe_substitute(env=kwargs['env'])
-        file = Template(file).safe_substitute(partition=kwargs['partition'])
-    else:
-        file = file.replace(static.PARTITION_TOKEN, "")
-        python_init = Template(static.CC_PYTHON_INIT_TOKEN).safe_substitute(pip_install=static.CC_PIP_INSTALLS[kwargs['env']])
+    myfile = static.SLURM_TEMPLATE
+    myfile = add_slurm_option(myfile, f"#SBATCH --mem={kwargs['mem']}")
+    myfile = add_slurm_option(myfile, f"#SBATCH --time=00-{kwargs['hrs']}:00")
+    myfile = add_slurm_option(myfile, f"#SBATCH --cpus-per-task={kwargs['cpu']}")
+    myfile = add_slurm_option(myfile, f"#SBATCH --output=%x-%j.out")
+    myfile = add_slurm_option(myfile, f"#SBATCH --partition={kwargs['partition']}")
 
-    file = Template(file).safe_substitute(init=python_init)
+    if kwargs['gpu']:
+        myfile = add_slurm_option(myfile, f"#SBATCH --gres=gpu:1")
 
-    if not kwargs['gpu']:
-        file = file.replace(static.SLURM_GPU_TOKEN, '')
-        file = file.replace("tensorflow_gpu", "tensorflow_cpu")
+    if "nodelist" in kwargs:
+        myfile = add_slurm_option(myfile, "#SBATCH --nodelist=" + ",".join(kwargs['nodelist']))
 
-    file = Template(file).safe_substitute(hrs=kwargs['hrs'], mem=kwargs['mem'], cpu=kwargs['cpu'], python_command=python_command)
+    if "exclude" in kwargs:
+        myfile = add_slurm_option(myfile, "#SBATCH --exclude=" + ",".join(kwargs['exclude']))
+
+
+    init = f"source /ubc/cs/research/fwood/vadmas/miniconda3/bin/activate {kwargs['env']}"
+    myfile = Template(myfile).safe_substitute(init=init)
+    myfile = Template(myfile).safe_substitute(python_command=python_command)
+
 
     with open(file_name, 'w') as rsh:
-        rsh.write(file)
+        rsh.write(myfile)
+
+
+# def make_bash_script(python_command, file_name, **kwargs):
+#     file = static.SLURM_TEMPLATE
+#     # if host is UBC remove RRG
+#     # if host is cc remove partition
+#     if HOST == static.UBC:
+#         file = file.replace(static.RRG_TOKEN, "")
+#         python_init = Template(static.UBC_PYTHON_INIT_TOKEN).safe_substitute(env=kwargs['env'])
+#         file = Template(file).safe_substitute(partition=kwargs['partition'])
+#     else:
+#         file = file.replace(static.PARTITION_TOKEN, "")
+#         python_init = Template(static.CC_PYTHON_INIT_TOKEN).safe_substitute(pip_install=static.CC_PIP_INSTALLS[kwargs['env']])
+
+#     file = Template(file).safe_substitute(init=python_init)
+
+#     if not kwargs['gpu']:
+#         file = file.replace(static.SLURM_GPU_TOKEN, '')
+#         file = file.replace("tensorflow_gpu", "tensorflow_cpu")
+
+#     file = Template(file).safe_substitute(hrs=kwargs['hrs'], mem=kwargs['mem'], cpu=kwargs['cpu'], python_command=python_command)
+
+#     import ipdb; ipdb.set_trace()
+#     if "nodelist" in kwargs:
+#         option = "#SBATCH --nodelist=" + ",".join(kwargs['nodelist'])
+#         file = add_slurm_option(file, option)
+
+#     with open(file_name, 'w') as rsh:
+#         rsh.write(file)
+
+
+def add_slurm_option(file, option):
+    return file.replace("\n\n",f"\n\n{option}\n", 1) # set maxreplace = 1 to only replace first occurance
+
 
 
 def make_commands(hyper_string, experiment_name, job_idx, file_storage_observer):
