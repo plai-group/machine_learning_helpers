@@ -33,7 +33,7 @@ SRC_PATH       = ""
 DATA_DIR       = ""
 RESULTS_DIR    = ""
 
-SLEEP_TIME = 0.25
+SLEEP_TIME = 0.50
 
 REQUIRED_OPTIONS = set(["gpu", "hrs", "cpu", "mem", "partition", "env"])
 
@@ -68,23 +68,22 @@ def submit(hyper_params,
 
     ask = True
     for idx, hyper_string in enumerate(hypers):
-        if manual_mode:
-            path = Path("./manual")
-            path.mkdir(exist_ok=True)
-            scheduler_command, python_command = make_commands(hyper_string, experiment_name, idx, file_storage_observer)
-            file_name = static.SUBMISSION_FILE_NAME.replace(".sh", f"{idx}.sh")
-            scheduler_command = scheduler_command.replace(static.SUBMISSION_FILE_NAME, file_name)
-            make_bash_script(python_command, str(path/file_name), **kwargs)
-            print(scheduler_command)
-            continue
+        # if manual_mode:
+        #     path = Path("./manual")
+        #     path.mkdir(exist_ok=True)
+        #     scheduler_command, python_command, job_dir = make_commands(hyper_string, experiment_name, idx, file_storage_observer)
+        #     file_name = static.SUBMISSION_FILE_NAME.replace(".sh", f"{idx}.sh")
+        #     scheduler_command = scheduler_command.replace(static.SUBMISSION_FILE_NAME, file_name)
+        #     make_bash_script(python_command, str(path/file_name), **kwargs)
+        #     print(scheduler_command)
+        #     continue
         if ask:
             flag = input("Submit ({}/{}): {}? (y/n/all/exit) ".format(idx + 1, len(hypers), hyper_string))
         if flag in ['yes', 'all', 'y', 'a']:
-            scheduler_command, python_command = make_commands(hyper_string, experiment_name, idx, file_storage_observer)
-            make_bash_script(python_command, static.SUBMISSION_FILE_NAME, **kwargs)
+            scheduler_command, python_command, job_dir = make_commands(hyper_string, experiment_name, idx, file_storage_observer)
+            make_bash_script(python_command, static.SUBMISSION_FILE_NAME, job_dir, **kwargs)
             output = subprocess.check_output(scheduler_command,  stderr=subprocess.STDOUT, shell=True)
             print("Submitting ({}/{}): {}".format(idx + 1, len(hypers), output.strip().decode()))
-
         if flag in ['all', 'a']:
             ask = False
             time.sleep(SLEEP_TIME)
@@ -99,7 +98,6 @@ def submit(hyper_params,
 
 # Strictly enforce directory structure
 def verify_dirs(experiment_dir, experiment_name, script_name):
-    experiment_dir = Path(experiment_dir)
     project_dir    = Path(experiment_dir).parents[1]
     src_path       = Path(project_dir) / script_name
     data_dir       = Path(project_dir) / 'data'
@@ -110,15 +108,16 @@ def verify_dirs(experiment_dir, experiment_name, script_name):
 
     now = datetime.datetime.now()
 
-    results_dir = experiment_dir / 'results' / experiment_name / now.strftime("%Y_%m_%d_%H:%M:%S")
-
     # make global
     global PROJECT_DIR
     global EXPERIMENT_DIR
     global SRC_PATH
-    global DATA_DIR
     global RESULTS_DIR
-    PROJECT_DIR, EXPERIMENT_DIR, SRC_PATH, DATA_DIR, RESULTS_DIR = project_dir, experiment_dir, src_path, data_dir, results_dir
+
+    PROJECT_DIR = project_dir
+    EXPERIMENT_DIR = experiment_dir
+    SRC_PATH = f"{script_name}"
+    RESULTS_DIR = f'results/{experiment_name}/{now.strftime("%Y_%m_%d_%H:%M:%S")}'
 
 
 def job_name_to_hyper_string(failed_job_names):
@@ -162,7 +161,7 @@ def make_hyper_string_from_dict(hyper_dict):
 
     return commands
 
-def make_bash_script(python_command, file_name, **kwargs):
+def make_bash_script(python_command, file_name, job_dir, **kwargs):
     if HOST == static.CC:
         raise ValueError("Not written for cc yet")
 
@@ -182,11 +181,12 @@ def make_bash_script(python_command, file_name, **kwargs):
     if "exclude" in kwargs:
         myfile = add_slurm_option(myfile, "#SBATCH --exclude=" + ",".join(kwargs['exclude']))
 
-
-    init = f"source /ubc/cs/research/fwood/vadmas/miniconda3/bin/activate {kwargs['env']}"
-    myfile = Template(myfile).safe_substitute(init=init)
-    myfile = Template(myfile).safe_substitute(python_command=python_command)
-
+    myfile = Template(myfile).safe_substitute(
+        init=f"source /ubc/cs/research/fwood/vadmas/miniconda3/bin/activate {kwargs['env']}",
+        python_command=python_command,
+        home_dir=PROJECT_DIR,
+        job_dir=job_dir
+    )
 
     with open(file_name, 'w') as rsh:
         rsh.write(myfile)
@@ -221,23 +221,20 @@ def make_bash_script(python_command, file_name, **kwargs):
 #         rsh.write(file)
 
 
-def add_slurm_option(file, option):
-    return file.replace("\n\n",f"\n\n{option}\n", 1) # set maxreplace = 1 to only replace first occurance
-
-
+def add_slurm_option(myfile, option):
+    return myfile.replace("\n\n",f"\n\n{option}\n", 1) # set maxreplace = 1 to only replace first occurance
 
 def make_commands(hyper_string, experiment_name, job_idx, file_storage_observer):
-
-    job_dir = Path(RESULTS_DIR) / f"job_{job_idx}"
+    job_dir = Path(EXPERIMENT_DIR) / Path(RESULTS_DIR) / f"job_{job_idx}"
     job_dir.mkdir(exist_ok=False, parents=True)
 
     model_dir = job_dir / 'models'
     model_dir.mkdir(exist_ok=False, parents=True)
 
-    python_command = f"python {SRC_PATH} with data_dir={DATA_DIR} model_dir={model_dir} {hyper_string} -p --name {experiment_name}"
+    python_command = f"python $HOME_DIR/{SRC_PATH} with data_dir=$HOME_DIR/data model_dir=$JOB_DIR/models {hyper_string} -p --name {experiment_name}"
 
     if file_storage_observer or (HOST == static.CC):
-        python_command = f"{python_command} -F {RESULTS_DIR}/file_storage_observer"
+        python_command = f"{python_command} -F $JOB_DIR/file_storage_observer"
 
     args_file_name = job_dir / "args.txt"
     res_name = job_dir / 'results.res'
@@ -248,5 +245,5 @@ def make_commands(hyper_string, experiment_name, job_idx, file_storage_observer)
 
     scheduler_command = f"sbatch -o {res_name} -e {err_name} -J {experiment_name} --export=ALL {static.SUBMISSION_FILE_NAME}"
 
-    return scheduler_command, python_command
+    return scheduler_command, python_command, job_dir
 

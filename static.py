@@ -12,10 +12,14 @@ SLURM_TEMPLATE = f'''#!/bin/bash
 echo "Current working directory: `pwd`"
 echo "Starting run at: `/bin/date`"
 
+export HOME_DIR=$home_dir
+export JOB_DIR=$job_dir
+
 $init
 
 echo "Running python command:"
 echo "$python_command"
+
 $python_command
 
 echo "Ending run at: `/bin/date`"
