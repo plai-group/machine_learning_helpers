@@ -26,35 +26,6 @@ echo "Ending run at: `/bin/date`"
 echo 'Job complete!'
 '''
 
-
-# # 'tags' ($cpu, $mem) are filled dynamically in job_submitter
-# SLURM_TEMPLATE = f'''#!/bin/bash
-
-# {SLURM_GPU_TOKEN}
-# #SBATCH --mem=$mem
-# #SBATCH --time=00-$hrs:00
-# #SBATCH --output=%x-%j.out
-# #SBATCH --cpus-per-task=$cpu
-# {PARTITION_TOKEN}
-# {RRG_TOKEN}
-
-# # ---------------------------------------------------------------------
-# echo "Current working directory: `pwd`"
-# echo "Starting run at: `/bin/date`"
-
-# $init
-
-# echo "Running python command:"
-# echo "$python_command"
-# $python_command
-
-# echo "Ending run at: `/bin/date`"
-# echo 'Job complete!'
-# '''
-
-
-UBC_PYTHON_INIT_TOKEN = f'source /ubc/cs/research/fwood/vadmas/miniconda3/bin/activate $env'
-
 CC_PYTHON_INIT_TOKEN = f'''
 module load python/3.6
 virtualenv --no-download $SLURM_TMPDIR/env

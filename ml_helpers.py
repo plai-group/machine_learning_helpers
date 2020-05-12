@@ -933,6 +933,7 @@ def ess(log_weight):
 
 
 def get_experiments_from_fs(path):
+    path = Path(path)
     assert (path / '_resources/').exists() & (path / '_sources/').exists(), f"Bad path: {path}"
     exps = {}
     dfs = []
@@ -965,9 +966,31 @@ def get_experiments_from_fs(path):
     return exps, df
 
 
+def get_experiments_from_job_dir(path, observer_name="file_storage_observer"):
+    exps = {}
+    dfs = {}
+    for p in Path(path).rglob(observer_name):
+        _id = p.parts[-2].split("_")[1]
+        exp, df = get_experiments_from_fs(p)
+        exps[_id] = exp
+        dfs[_id] = df
+
+    exp = pd.concat(exps.values(), keys=exps.keys()).droplevel(1)
+    df = pd.concat(dfs.values(), keys=dfs.keys()).droplevel(1)
+
+    exp.index.name = '_id'
+    df.index.names = ['_id', 'metric', 'index']
+
+    return exp, df
+
 def process_dictionary_column(df, column_name):
     return df.drop(column_name, 1).assign(**pd.DataFrame(df[column_name].values.tolist(), index=df.index))
 
-
 def process_tuple_column(df, column_name, output_column_names):
     return df.drop(column_name, 1).assign(**pd.DataFrame(df[column_name].values.tolist(), index=df.index))
+
+def process_list_column(df, column_name, output_column_names):
+    new = pd.DataFrame(df[column_name].values.tolist(), index=df.index, columns=output_column_names)
+    old = df.drop(column_name, 1)
+    return old.merge(new, left_index=True, right_index=True)
+

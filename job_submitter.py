@@ -192,35 +192,6 @@ def make_bash_script(python_command, file_name, job_dir, **kwargs):
         rsh.write(myfile)
 
 
-# def make_bash_script(python_command, file_name, **kwargs):
-#     file = static.SLURM_TEMPLATE
-#     # if host is UBC remove RRG
-#     # if host is cc remove partition
-#     if HOST == static.UBC:
-#         file = file.replace(static.RRG_TOKEN, "")
-#         python_init = Template(static.UBC_PYTHON_INIT_TOKEN).safe_substitute(env=kwargs['env'])
-#         file = Template(file).safe_substitute(partition=kwargs['partition'])
-#     else:
-#         file = file.replace(static.PARTITION_TOKEN, "")
-#         python_init = Template(static.CC_PYTHON_INIT_TOKEN).safe_substitute(pip_install=static.CC_PIP_INSTALLS[kwargs['env']])
-
-#     file = Template(file).safe_substitute(init=python_init)
-
-#     if not kwargs['gpu']:
-#         file = file.replace(static.SLURM_GPU_TOKEN, '')
-#         file = file.replace("tensorflow_gpu", "tensorflow_cpu")
-
-#     file = Template(file).safe_substitute(hrs=kwargs['hrs'], mem=kwargs['mem'], cpu=kwargs['cpu'], python_command=python_command)
-
-#     import ipdb; ipdb.set_trace()
-#     if "nodelist" in kwargs:
-#         option = "#SBATCH --nodelist=" + ",".join(kwargs['nodelist'])
-#         file = add_slurm_option(file, option)
-
-#     with open(file_name, 'w') as rsh:
-#         rsh.write(file)
-
-
 def add_slurm_option(myfile, option):
     return myfile.replace("\n\n",f"\n\n{option}\n", 1) # set maxreplace = 1 to only replace first occurance
 
@@ -228,10 +199,10 @@ def make_commands(hyper_string, experiment_name, job_idx, file_storage_observer)
     job_dir = Path(EXPERIMENT_DIR) / Path(RESULTS_DIR) / f"job_{job_idx}"
     job_dir.mkdir(exist_ok=False, parents=True)
 
-    model_dir = job_dir / 'models'
-    model_dir.mkdir(exist_ok=False, parents=True)
+    artifact_dir = job_dir / 'artifacts'
+    artifact_dir.mkdir(exist_ok=False, parents=True)
 
-    python_command = f"python $HOME_DIR/{SRC_PATH} with data_dir=$HOME_DIR/data model_dir=$JOB_DIR/models {hyper_string} -p --name {experiment_name}"
+    python_command = f"python $HOME_DIR/{SRC_PATH} with data_dir=$HOME_DIR/data artifact_dir=$JOB_DIR/models {hyper_string} -p --name {experiment_name}"
 
     if file_storage_observer or (HOST == static.CC):
         python_command = f"{python_command} -F $JOB_DIR/file_storage_observer"
