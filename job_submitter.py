@@ -3,6 +3,7 @@ import os
 from string import Template
 import time
 import datetime
+import pandas as pd
 from pprint import pprint
 from pathlib import Path
 import sys
@@ -47,13 +48,14 @@ def submit(hyper_params,
            manual_mode=False,
            file_storage_observer=False,
            script_name="main.py",
+           prune_successful='',
            **kwargs):
 
     # Validate arguments
     verify_dirs(experiment_dir, experiment_name, script_name)
 
     # Display info
-    hypers = process_hyperparameters(hyper_params)
+    hypers = process_hyperparameters(hyper_params, prune_successful)
 
     assert REQUIRED_OPTIONS.issubset(set(kwargs.keys())), f"{REQUIRED_OPTIONS} must be specified"
 
@@ -68,15 +70,6 @@ def submit(hyper_params,
 
     ask = True
     for idx, hyper_string in enumerate(hypers):
-        # if manual_mode:
-        #     path = Path("./manual")
-        #     path.mkdir(exist_ok=True)
-        #     scheduler_command, python_command, job_dir = make_commands(hyper_string, experiment_name, idx, file_storage_observer)
-        #     file_name = static.SUBMISSION_FILE_NAME.replace(".sh", f"{idx}.sh")
-        #     scheduler_command = scheduler_command.replace(static.SUBMISSION_FILE_NAME, file_name)
-        #     make_bash_script(python_command, str(path/file_name), **kwargs)
-        #     print(scheduler_command)
-        #     continue
         if ask:
             flag = input("Submit ({}/{}): {}? (y/n/all/exit) ".format(idx + 1, len(hypers), hyper_string))
         if flag in ['yes', 'all', 'y', 'a']:
@@ -120,31 +113,33 @@ def verify_dirs(experiment_dir, experiment_name, script_name):
     RESULTS_DIR = f'results/{experiment_name}/{now.strftime("%Y_%m_%d_%H:%M:%S")}'
 
 
-def job_name_to_hyper_string(failed_job_names):
-    if isinstance(failed_job_names, (str)):
-        failed_job_names = [failed_job_names]
-    def process(name):
-        return (name
-                 .replace(".res", "")
-                 .replace(".err", "")
-                 .replace(".", " "))
-    return [process(name) for name in failed_job_names]
-
-
 #################################
 # ------- hyperparameters -------
 #################################
 
-def process_hyperparameters(hyper_params):
+def process_hyperparameters(hyper_params, prune_successful=''):
+    df = None
+    if prune_successful:
+        flag = input(f"Prune submits based on {prune_successful}?")
+        if flag in ['yes', 'all', 'y', 'a']:
+            df = pd.read_csv(prune_successful, index_col=0)
     if isinstance(hyper_params, dict):
-        return make_hyper_string_from_dict(hyper_params)
+        return make_hyper_string_from_dict(hyper_params, df)
     elif isinstance(hyper_params, list):
-        return list(itertools.chain.from_iterable([make_hyper_string_from_dict(d) for d in hyper_params]))
+        return list(itertools.chain.from_iterable([make_hyper_string_from_dict(d, df) for d in hyper_params]))
     else:
         raise ValueError("hyper_params must be either a single dictionary or a list of dictionaries")
 
+
+def verify_header(header, df):
+    if df is None:
+        return True
+    else:
+        tokens = [df[df[k] == v].shape[0] != 0 for k, v in header]
+    return all(tokens)
+
 # returns strings of form: name1=value1 name2=value2 name3=value3...
-def make_hyper_string_from_dict(hyper_dict):
+def make_hyper_string_from_dict(hyper_dict, df):
     # Check all values are iterable lists
     def type_check(value):
         if isinstance(value, (list, range)):
@@ -156,21 +151,22 @@ def make_hyper_string_from_dict(hyper_dict):
 
     commands = []
     for args in itertools.product(*hyper_dict.values()):
-        command = "".join(["'{}={}' ".format(k, v) for k, v in zip(hyper_dict.keys(), args)])
-        commands.append(command[:-1])
+        header = list(zip(hyper_dict.keys(), args))
+        if verify_header(header, df):
+            command = "".join(["'{}={}' ".format(k, v) for k, v in header])
+            commands.append(command[:-1])
+        else:
+            print(f"skipping: {header}")
 
     return commands
 
-def make_bash_script(python_command, file_name, job_dir, **kwargs):
-    if HOST == static.CC:
-        raise ValueError("Not written for cc yet")
 
+def make_bash_script(python_command, file_name, job_dir, **kwargs):
     myfile = static.SLURM_TEMPLATE
     myfile = add_slurm_option(myfile, f"#SBATCH --mem={kwargs['mem']}")
     myfile = add_slurm_option(myfile, f"#SBATCH --time=00-{kwargs['hrs']}:00")
     myfile = add_slurm_option(myfile, f"#SBATCH --cpus-per-task={kwargs['cpu']}")
     myfile = add_slurm_option(myfile, f"#SBATCH --output=%x-%j.out")
-    myfile = add_slurm_option(myfile, f"#SBATCH --partition={kwargs['partition']}")
 
     if kwargs['gpu']:
         myfile = add_slurm_option(myfile, f"#SBATCH --gres=gpu:1")
@@ -181,8 +177,15 @@ def make_bash_script(python_command, file_name, job_dir, **kwargs):
     if "exclude" in kwargs:
         myfile = add_slurm_option(myfile, "#SBATCH --exclude=" + ",".join(kwargs['exclude']))
 
+    if HOST == static.UBC:
+        myfile = add_slurm_option(myfile, f"#SBATCH --partition={kwargs['partition']}")
+        python_init = f"source /ubc/cs/research/fwood/vadmas/miniconda3/bin/activate {kwargs['env']}"
+    else:
+        myfile = add_slurm_option(myfile, f"#SBATCH --account=rrg-kevinlb")
+        python_init = Template(static.CC_PYTHON_INIT_TOKEN).safe_substitute(pip_install=static.CC_PIP_INSTALLS[kwargs['env']])
+
     myfile = Template(myfile).safe_substitute(
-        init=f"source /ubc/cs/research/fwood/vadmas/miniconda3/bin/activate {kwargs['env']}",
+        init= python_init,
         python_command=python_command,
         home_dir=PROJECT_DIR,
         job_dir=job_dir
