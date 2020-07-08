@@ -6,7 +6,6 @@ import json
 import os
 import pickle
 import random
-import shutil
 import socket
 import sys
 import time
@@ -42,7 +41,8 @@ PRUNE_COLUMNS = [
 persist_dir = Path('./.persistdir')
 
 
-def nested_dict(): return defaultdict(nested_dict)
+def nested_dict():
+    return defaultdict(nested_dict)
 
 # from the excellent https://github.com/pytorch/vision/blob/master/references/detection/utils.py
 
@@ -1117,8 +1117,6 @@ def tensor(data, args=None, dtype=torch.float):
     else:
         return torch.tensor(np.array(data), device=device, dtype=dtype)
 
-# convert whatever to numpy array
-
 
 def numpyify(val):
     if isinstance(val, dict):
@@ -1130,19 +1128,16 @@ def numpyify(val):
     else:
         raise ValueError("Not handled")
 
-# "s" suffix stands for safe
 
-
-def sarray(val):
+def array(val):
     return numpyify(val)
 
 
 def slist(val):
+    """
+    safe list
+    """
     if isinstance(val, list):
         return val
     else:
         return [val]
-
-
-def stensor(val, **kwargs):
-    return tensor(val, **kwargs)
