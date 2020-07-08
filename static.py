@@ -41,11 +41,10 @@ echo "Virutalenv created"
 CC_PIP_INSTALLS = {}
 
 CC_PIP_INSTALLS['ml3'] = f'''
-pip install GPy pyDOE scikit-image emukit tqdm seaborn
+pip install GPy pyDOE scikit-image emukit tqdm seaborn python-Levenshtein nltk
 '''
 
 CC_PIP_INSTALLS['vodasafe'] = f'''
 pip install scikit_learn pillow tqdm imbalanced-learn torchvision pycocotools
 '''
-
 

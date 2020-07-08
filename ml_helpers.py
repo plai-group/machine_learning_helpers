@@ -23,6 +23,22 @@ from joblib import Parallel, delayed
 from sklearn import metrics
 from torch._six import inf
 
+PRUNE_COLUMNS = [
+'__doc__',
+'checkpoint',
+'meta',
+'resources',
+'checkpoint_frequency',
+'cuda',
+'heartbeat',
+'verbose',
+'command',
+'data_dir',
+'experiment',
+'artifact_dir',
+'artifacts',
+]
+
 persist_dir = Path('./.persistdir')
 nested_dict = lambda: defaultdict(nested_dict)
 
@@ -973,10 +989,19 @@ def duplicate(X, N, axis=0):
 def safe_json_load(path):
     path = Path(path)
     res = {}
-    if path.stat().st_size != 0:
-        with open(path) as data_file:
-            res = json.load(data_file)
+    try:
+        if path.stat().st_size != 0:
+            with open(path) as data_file:
+                res = json.load(data_file)
+    except Exception as e:
+        print(f"{path} raised exception:")
+        print("------------------------------")
+        print(e)
+        print("------------------------------")
+
     return res
+
+
 
 def get_experiments_from_fs(path):
     path = Path(path)
@@ -988,6 +1013,7 @@ def get_experiments_from_fs(path):
         if job.parts[-1] in ['_resources', '_sources']:
             continue
         job_id = job.parts[-1]
+
 
         run = safe_json_load(job / 'run.json')
         config = safe_json_load(job / 'config.json')
@@ -1010,7 +1036,7 @@ def get_experiments_from_fs(path):
     return exps, df
 
 
-def get_experiments_from_dir(path, observer_name="file_storage_observer"):
+def get_experiments_from_dir(path, observer_name="file_storage_observer", prune=PRUNE_COLUMNS):
     path = Path(path)
     assert path.exists(), f'Bad path: {path}'
     exps = {}
@@ -1033,6 +1059,8 @@ def get_experiments_from_dir(path, observer_name="file_storage_observer"):
     else:
         raise ValueError(f"results empty! path:{path}")
 
+    if prune:
+        exps = exps.remove_columns([c for c in prune if c in exps.columns])
     return exps, dfs
 
 def post_process(exp, df, CUTOFF_EPOCH=2000):
@@ -1055,7 +1083,9 @@ def post_process(exp, df, CUTOFF_EPOCH=2000):
 
 def process_dictionary_column(df, column_name):
     if column_name in df.columns:
-        return df.drop(column_name, 1).assign(**pd.DataFrame(df[column_name].values.tolist(), index=df.index))
+        return (df
+               .join(df[column_name].apply(pd.Series))
+               .drop(column_name, 1))
     else:
         return df
 
@@ -1084,3 +1114,12 @@ def copy_directory(src, dest):
         else:
             print('Directory not copied. Error: %s' % e)
             raise
+
+def show_uniques(df):
+    for col in df:
+        print(f'{col}: ', df[col].unique())
+
+
+def highlight_best(df, col):
+    best = df[col].max()
+    return df.style.apply(lambda x: ['background: lightgreen' if (x[col] == best) else '' for i in x], axis=1)
