@@ -1,6 +1,7 @@
 from __future__ import division, print_function
 from collections import defaultdict, deque
 from joblib import Parallel, delayed
+import errno
 from pathlib import Path
 from torch._six import inf
 import datetime
@@ -16,6 +17,8 @@ import sys
 import time
 import torch
 import torch.distributed as dist
+import shutil
+
 
 persist_dir = Path('./.persistdir')
 nested_dict = lambda: defaultdict(nested_dict)
@@ -278,6 +281,17 @@ def mkdir(path):
         os.makedirs(path)
     except OSError as e:
         if e.errno != errno.EEXIST:
+            raise
+
+def copy_directory(src, dest):
+    try:
+        shutil.copytree(src, dest)
+    except OSError as e:
+        # If the error was caused because the source wasn't a directory
+        if e.errno == errno.ENOTDIR:
+            shutil.copy(src, dest)
+        else:
+            print('Directory not copied. Error: %s' % e)
             raise
 
 
@@ -669,8 +683,16 @@ def classification_metrics(tp, tn, fp, fn):
         "recall": float(recall),
         "f1": float(f1),
         "sensitivity": float(sensitivity),
-        "specificity": float(specificity),
+        "tp": float(tp),
+        "tn": float(tn),
+        "fp": float(fp),
+        "fn": float(fn),
     }
+
+
+
+
+
 
 # convert whatever to numpy array
 
