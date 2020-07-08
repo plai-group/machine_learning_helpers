@@ -1112,8 +1112,8 @@ def tensor(data, args=None, dtype=torch.float):
     device = torch.device('cpu') if args is None else args.device
     if torch.is_tensor(data):
         return data.to(dtype=dtype, device=device)
-    elif isinstance(data, list):
-        return torch.cat(data)
+    elif isinstance(data, list) and torch.is_tensor(data[0]):
+        return torch.stack(data)
     else:
         return torch.tensor(np.array(data), device=device, dtype=dtype)
 
