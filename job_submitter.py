@@ -69,6 +69,7 @@ def submit(hyper_params,
     print("-------({} runs)-------".format(len(hypers)))
 
     ask = True
+    flag = 'y'
     for idx, hyper_string in enumerate(hypers):
         if ask:
             flag = input("Submit ({}/{}): {}? (y/n/all/exit) ".format(idx + 1, len(hypers), hyper_string))
@@ -181,7 +182,7 @@ def make_bash_script(python_command, file_name, job_dir, **kwargs):
         myfile = add_slurm_option(myfile, f"#SBATCH --partition={kwargs['partition']}")
         python_init = f"source /ubc/cs/research/fwood/vadmas/miniconda3/bin/activate {kwargs['env']}"
     else:
-        myfile = add_slurm_option(myfile, f"#SBATCH --account=rrg-kevinlb")
+        myfile = add_slurm_option(myfile, f"#SBATCH --account={kwargs['account']}")
         python_init = Template(static.CC_PYTHON_INIT_TOKEN).safe_substitute(pip_install=static.CC_PIP_INSTALLS[kwargs['env']])
 
     myfile = Template(myfile).safe_substitute(

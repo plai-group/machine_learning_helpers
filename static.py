@@ -31,7 +31,7 @@ module load python/3.6
 virtualenv --no-download $SLURM_TMPDIR/env
 source $SLURM_TMPDIR/env/bin/activate
 pip install --no-index --upgrade pip
-pip install --no-index torch
+pip install --no-index torch torchvision
 pip install joblib sacred pymongo wandb tensorboard scikit-image sklearn
 $pip_install
 echo "Virutalenv created"
@@ -41,7 +41,7 @@ echo "Virutalenv created"
 CC_PIP_INSTALLS = {}
 
 CC_PIP_INSTALLS['ml3'] = f'''
-pip install GPy pyDOE scikit-image emukit tqdm
+pip install GPy pyDOE scikit-image emukit tqdm seaborn
 '''
 
 CC_PIP_INSTALLS['vodasafe'] = f'''

@@ -1,24 +1,26 @@
 from __future__ import division, print_function
-from collections import defaultdict, deque
-from joblib import Parallel, delayed
-import errno
-from pathlib import Path
-from torch._six import inf
 import datetime
 import errno
-import joblib
 import json
-import numpy as np
 import os
-import pandas as pd
 import pickle
 import random
+import shutil
+import socket
 import sys
 import time
+from collections import defaultdict, deque
+from datetime import datetime
+from pathlib import Path
+
+import joblib
+import numpy as np
+import pandas as pd
 import torch
 import torch.distributed as dist
-import shutil
-
+from joblib import Parallel, delayed
+from sklearn import metrics
+from torch._six import inf
 
 persist_dir = Path('./.persistdir')
 nested_dict = lambda: defaultdict(nested_dict)
@@ -670,6 +672,10 @@ def hits_and_misses(y_hat, y_testing):
     fn = sum(y_testing - y_hat > 0)
     return tp, tn, fp, fn
 
+def get_auc(roc):
+    prec = roc['prec'].fillna(1)
+    recall = roc['recall']
+    return metrics.auc(recall, prec)
 
 def classification_metrics(tp, tn, fp, fn):
     precision   = tp / (tp + fp)
@@ -679,19 +685,16 @@ def classification_metrics(tp, tn, fp, fn):
     specificity = tn / (tn + fp)
 
     return {
-        "precision": float(precision),
-        "recall": float(recall),
-        "f1": float(f1),
-        "sensitivity": float(sensitivity),
         "tp": float(tp),
         "tn": float(tn),
         "fp": float(fp),
         "fn": float(fn),
+        "prec": float(precision),
+        "recall": float(recall),
+        "f1": float(f1),
+        "sensitivity": float(sensitivity),
+        "specificity": float(specificity)
     }
-
-
-
-
 
 
 # convert whatever to numpy array
@@ -953,10 +956,41 @@ def ess(log_weight):
 
     return torch.exp(log_ess(log_weight))
 
+def get_unique_dir(comment=None):
+    current_time = datetime.now().strftime('%b%d_%H-%M-%S')
+    host = socket.gethostname()
+    name = f"{current_time}_{host}"
+    if comment: name = f"{name}_{comment}"
+    return name
+
+
+def spread(X, N, axis=0):
+    """
+    Takes a 1-d vector and spreads it out over
+    N rows s.t spread(X, N).sum(0) = X
+    """
+    return (1 / N) * duplicate(X, N, axis)
+
+def duplicate(X, N, axis=0):
+    """
+    Takes a 1-d vector and duplicates it across
+    N rows s.t spread(X, N).sum(axis) = N*X
+    """
+    order = (N, 1) if axis == 0 else (1, N)
+    return X.unsqueeze(axis).repeat(*order)
+
+
+def safe_json_load(path):
+    path = Path(path)
+    res = {}
+    if path.stat().st_size != 0:
+        with open(path) as data_file:
+            res = json.load(data_file)
+    return res
 
 def get_experiments_from_fs(path):
     path = Path(path)
-    assert (path / '_resources/').exists() & (path / '_sources/').exists(), f"Bad path: {path}"
+    assert (path / '_sources/').exists(), f"Bad path: {path}"
     exps = {}
     dfs = []
 
@@ -964,17 +998,13 @@ def get_experiments_from_fs(path):
         if job.parts[-1] in ['_resources', '_sources']:
             continue
         job_id = job.parts[-1]
-        run = job / 'run.json'
-        config = job / 'config.json'
-        with open(run) as data_file:
-            run = json.load(data_file)
-        with open(config) as data_file:
-            config = json.load(data_file)
+
+        run = safe_json_load(job / 'run.json')
+        config = safe_json_load(job / 'config.json')
+        metrics = safe_json_load(job / 'metrics.json')
+
         exps[job_id] = {**config, **run}
 
-        metrics = job / 'metrics.json'
-        with open(metrics) as data_file:
-            metrics = json.load(data_file)
         if metrics:
             for metric, v in metrics.items():
                 df = pd.DataFrame(v)
@@ -982,37 +1012,73 @@ def get_experiments_from_fs(path):
                 dfs += [df]
 
     exps = pd.DataFrame(exps).T
-    pd.DataFrame(exps).index.name = '_id'
-    df = pd.concat(dfs).drop('timestamps', axis=1)
-
+    exps.index.name = '_id'
+    if dfs:
+        df = pd.concat(dfs).drop('timestamps', axis=1)
+    else:
+        df = None
     return exps, df
 
 
-def get_experiments_from_job_dir(path, observer_name="file_storage_observer"):
+def get_experiments_from_dir(path, observer_name="file_storage_observer"):
+    path = Path(path)
+    assert path.exists(), f'Bad path: {path}'
     exps = {}
     dfs = {}
-    for p in Path(path).rglob(observer_name):
-        _id = p.parts[-2].split("_")[1]
+    for p in path.rglob(observer_name):
+        _id = str(p).replace(f"/{observer_name}", "")
         exp, df = get_experiments_from_fs(p)
         exps[_id] = exp
-        dfs[_id] = df
+        if df is None:
+            print(f"{p} returned empty df")
+        else:
+            dfs[_id] = df
 
-    exp = pd.concat(exps.values(), keys=exps.keys()).droplevel(1)
-    df = pd.concat(dfs.values(), keys=dfs.keys()).droplevel(1)
+    if exps and dfs:
+        exps = pd.concat(exps.values(), keys=exps.keys()).droplevel(1)
+        dfs = pd.concat(dfs.values(), keys=dfs.keys()).droplevel(1)
 
-    exp.index.name = '_id'
-    df.index.names = ['_id', 'metric', 'index']
+        exps.index.name = '_id'
+        dfs.index.names = ['_id', 'metric', 'index']
+    else:
+        raise ValueError(f"results empty! path:{path}")
 
+    return exps, dfs
+
+def post_process(exp, df, CUTOFF_EPOCH=2000):
+    print(f"{exp[exp.status == 'COMPLETED'].shape[0]} jobs completed")
+    print(f"{exp[exp.status == 'RUNNING'].shape[0]} jobs timed out")
+    print(f"{exp[exp.status == 'FAILED'].shape[0]} jobs failed")
+
+    # Remove jobs that failed
+    exp = exp[exp.status != 'FAILED']
+
+    df = df[df.steps <= CUTOFF_EPOCH]
+
+    # get values at last epoch
+    results_at_cutoff = df[df.steps == CUTOFF_EPOCH].reset_index().pivot(index='_id', columns='metric',values='values')
+
+    # join
+    exp = exp.join(results_at_cutoff, how='outer')
     return exp, df
 
+
 def process_dictionary_column(df, column_name):
-    return df.drop(column_name, 1).assign(**pd.DataFrame(df[column_name].values.tolist(), index=df.index))
+    if column_name in df.columns:
+        return df.drop(column_name, 1).assign(**pd.DataFrame(df[column_name].values.tolist(), index=df.index))
+    else:
+        return df
 
 def process_tuple_column(df, column_name, output_column_names):
-    return df.drop(column_name, 1).assign(**pd.DataFrame(df[column_name].values.tolist(), index=df.index))
+    if column_name in df.columns:
+        return df.drop(column_name, 1).assign(**pd.DataFrame(df[column_name].values.tolist(), index=df.index))
+    else:
+        return df
 
 def process_list_column(df, column_name, output_column_names):
-    new = pd.DataFrame(df[column_name].values.tolist(), index=df.index, columns=output_column_names)
-    old = df.drop(column_name, 1)
-    return old.merge(new, left_index=True, right_index=True)
-
+    if column_name in df.columns:
+        new = pd.DataFrame(df[column_name].values.tolist(), index=df.index, columns=output_column_names)
+        old = df.drop(column_name, 1)
+        return old.merge(new, left_index=True, right_index=True)
+    else:
+        return df
