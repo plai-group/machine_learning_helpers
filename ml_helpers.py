@@ -1,5 +1,4 @@
 from __future__ import division, print_function
-
 import datetime
 import errno
 import json
@@ -1102,18 +1101,6 @@ def process_list_column(df, column_name, output_column_names):
         return old.merge(new, left_index=True, right_index=True)
     else:
         return df
-
-
-def copy_directory(src, dest):
-    try:
-        shutil.copytree(src, dest)
-    except OSError as e:
-        # If the error was caused because the source wasn't a directory
-        if e.errno == errno.ENOTDIR:
-            shutil.copy(src, dest)
-        else:
-            print('Directory not copied. Error: %s' % e)
-            raise
 
 def show_uniques(df):
     for col in df:
