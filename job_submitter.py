@@ -69,6 +69,7 @@ def submit(hyper_params,
     print("-------({} runs)-------".format(len(hypers)))
 
     ask = True
+    flag = 'y'
     for idx, hyper_string in enumerate(hypers):
         if ask:
             flag = input("Submit ({}/{}): {}? (y/n/all/exit) ".format(idx + 1, len(hypers), hyper_string))

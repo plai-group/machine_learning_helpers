@@ -6,7 +6,6 @@ import json
 import os
 import pickle
 import random
-import shutil
 import socket
 import sys
 import time
@@ -23,10 +22,31 @@ from joblib import Parallel, delayed
 from sklearn import metrics
 from torch._six import inf
 
+PRUNE_COLUMNS = [
+    '__doc__',
+    'checkpoint',
+    'meta',
+    'resources',
+    'checkpoint_frequency',
+    'cuda',
+    'heartbeat',
+    'verbose',
+    'command',
+    'data_dir',
+    'experiment',
+    'artifact_dir',
+    'artifacts',
+]
+
 persist_dir = Path('./.persistdir')
-nested_dict = lambda: defaultdict(nested_dict)
+
+
+def nested_dict():
+    return defaultdict(nested_dict)
 
 # from the excellent https://github.com/pytorch/vision/blob/master/references/detection/utils.py
+
+
 class SmoothedValue(object):
     """Track a series of values and provide access to smoothed values over a
     window or the global series average.
@@ -268,6 +288,7 @@ def one_vs_all_cv(mylist):
         test = [train.pop(i)]
         folds += [(train, test)]
     return folds
+
 
 def warmup_lr_scheduler(optimizer, warmup_iters, warmup_factor):
     def f(x):
@@ -642,18 +663,23 @@ class BestMeter(object):
         self.mode = mode
 
 # https://stackoverflow.com/questions/10823877/what-is-the-fastest-way-to-flatten-arbitrarily-nested-lists-in-python
+
+
 def flatten(container):
     for i in container:
-        if isinstance(i, (list,tuple)):
+        if isinstance(i, (list, tuple)):
             yield from flatten(i)
         else:
             yield i
 
 # https://codereview.stackexchange.com/questions/185785/scale-numpy-array-to-certain-range
+
+
 def scale(x, out_range=(-1, 1)):
     domain = np.min(x), np.max(x)
     y = (x - (domain[1] + domain[0]) / 2) / (domain[1] - domain[0])
     return y * (out_range[1] - out_range[0]) + (out_range[1] + out_range[0]) / 2
+
 
 def hits_and_misses(y_hat, y_testing):
     tp = sum(y_hat + y_testing > 1)
@@ -662,10 +688,12 @@ def hits_and_misses(y_hat, y_testing):
     fn = sum(y_testing - y_hat > 0)
     return tp, tn, fp, fn
 
+
 def get_auc(roc):
     prec = roc['prec'].fillna(1)
     recall = roc['recall']
     return metrics.auc(recall, prec)
+
 
 def classification_metrics(tp, tn, fp, fn):
     precision   = tp / (tp + fp)
@@ -687,26 +715,8 @@ def classification_metrics(tp, tn, fp, fn):
     }
 
 
-# convert whatever to numpy array
-
-
-def numpyify(val):
-    if isinstance(val, dict):
-        return {k: np.array(v) for k, v in val.items()}
-    if isinstance(val, (float, int, list, np.ndarray)):
-        return np.array(val)
-    if isinstance(val, (torch.Tensor)):
-        return val.cpu().numpy()
-    else:
-        raise ValueError("Not handled")
-
-# Disable
-
-
 def block_print():
     sys.stdout = open(os.devnull, 'w')
-
-# Restore
 
 
 def enable_print():
@@ -769,14 +779,6 @@ def get(filename):
 
 def smooth(arr, window):
     return pd.Series(arr).rolling(window, min_periods=1).mean().values
-
-
-def tensor(data, args=None, dtype=torch.float):
-    device = torch.device('cpu') if args is None else args.device
-    if torch.is_tensor(data):
-        return data.to(dtype=dtype, device=device)
-    else:
-        return torch.tensor(np.array(data), device=device, dtype=dtype)
 
 
 def is_test_time(epoch, args):
@@ -946,6 +948,7 @@ def ess(log_weight):
 
     return torch.exp(log_ess(log_weight))
 
+
 def get_unique_dir(comment=None):
     current_time = datetime.now().strftime('%b%d_%H-%M-%S')
     host = socket.gethostname()
@@ -961,6 +964,7 @@ def spread(X, N, axis=0):
     """
     return (1 / N) * duplicate(X, N, axis)
 
+
 def duplicate(X, N, axis=0):
     """
     Takes a 1-d vector and duplicates it across
@@ -973,10 +977,18 @@ def duplicate(X, N, axis=0):
 def safe_json_load(path):
     path = Path(path)
     res = {}
-    if path.stat().st_size != 0:
-        with open(path) as data_file:
-            res = json.load(data_file)
+    try:
+        if path.stat().st_size != 0:
+            with open(path) as data_file:
+                res = json.load(data_file)
+    except Exception as e:
+        print(f"{path} raised exception:")
+        print("------------------------------")
+        print(e)
+        print("------------------------------")
+
     return res
+
 
 def get_experiments_from_fs(path):
     path = Path(path)
@@ -1010,7 +1022,7 @@ def get_experiments_from_fs(path):
     return exps, df
 
 
-def get_experiments_from_dir(path, observer_name="file_storage_observer"):
+def get_experiments_from_dir(path, observer_name="file_storage_observer", prune=PRUNE_COLUMNS):
     path = Path(path)
     assert path.exists(), f'Bad path: {path}'
     exps = {}
@@ -1033,7 +1045,10 @@ def get_experiments_from_dir(path, observer_name="file_storage_observer"):
     else:
         raise ValueError(f"results empty! path:{path}")
 
+    if prune:
+        exps = exps.remove_columns([c for c in prune if c in exps.columns])
     return exps, dfs
+
 
 def post_process(exp, df, CUTOFF_EPOCH=2000):
     print(f"{exp[exp.status == 'COMPLETED'].shape[0]} jobs completed")
@@ -1046,7 +1061,7 @@ def post_process(exp, df, CUTOFF_EPOCH=2000):
     df = df[df.steps <= CUTOFF_EPOCH]
 
     # get values at last epoch
-    results_at_cutoff = df[df.steps == CUTOFF_EPOCH].reset_index().pivot(index='_id', columns='metric',values='values')
+    results_at_cutoff = df[df.steps == CUTOFF_EPOCH].reset_index().pivot(index='_id', columns='metric', values='values')
 
     # join
     exp = exp.join(results_at_cutoff, how='outer')
@@ -1055,15 +1070,19 @@ def post_process(exp, df, CUTOFF_EPOCH=2000):
 
 def process_dictionary_column(df, column_name):
     if column_name in df.columns:
-        return df.drop(column_name, 1).assign(**pd.DataFrame(df[column_name].values.tolist(), index=df.index))
+        return (df
+                .join(df[column_name].apply(pd.Series))
+                .drop(column_name, 1))
     else:
         return df
+
 
 def process_tuple_column(df, column_name, output_column_names):
     if column_name in df.columns:
         return df.drop(column_name, 1).assign(**pd.DataFrame(df[column_name].values.tolist(), index=df.index))
     else:
         return df
+
 
 def process_list_column(df, column_name, output_column_names):
     if column_name in df.columns:
@@ -1074,13 +1093,51 @@ def process_list_column(df, column_name, output_column_names):
         return df
 
 
-def copy_directory(src, dest):
-    try:
-        shutil.copytree(src, dest)
-    except OSError as e:
-        # If the error was caused because the source wasn't a directory
-        if e.errno == errno.ENOTDIR:
-            shutil.copy(src, dest)
-        else:
-            print('Directory not copied. Error: %s' % e)
-            raise
+def show_uniques(df):
+    for col in df:
+        print(f'{col}: ', df[col].unique())
+
+
+def highlight_best(df, col):
+    best = df[col].max()
+    return df.style.apply(lambda x: ['background: lightgreen' if (x[col] == best) else '' for i in x], axis=1)
+
+
+"""
+Safe initalizers
+"""
+
+
+def tensor(data, args=None, dtype=torch.float):
+    device = torch.device('cpu') if args is None else args.device
+    if torch.is_tensor(data):
+        return data.to(dtype=dtype, device=device)
+    elif isinstance(data, list) and torch.is_tensor(data[0]):
+        return torch.stack(data)
+    else:
+        return torch.tensor(np.array(data), device=device, dtype=dtype)
+
+
+def numpyify(val):
+    if isinstance(val, dict):
+        return {k: np.array(v) for k, v in val.items()}
+    if isinstance(val, (float, int, list, np.ndarray)):
+        return np.array(val)
+    if isinstance(val, (torch.Tensor)):
+        return val.cpu().numpy()
+    else:
+        raise ValueError("Not handled")
+
+
+def array(val):
+    return numpyify(val)
+
+
+def slist(val):
+    """
+    safe list
+    """
+    if isinstance(val, list):
+        return val
+    else:
+        return [val]

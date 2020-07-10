@@ -48,4 +48,3 @@ CC_PIP_INSTALLS['vodasafe'] = f'''
 pip install scikit_learn pillow tqdm imbalanced-learn torchvision pycocotools
 '''
 
-
