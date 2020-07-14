@@ -781,21 +781,6 @@ def smooth(arr, window):
     return pd.Series(arr).rolling(window, min_periods=1).mean().values
 
 
-def is_test_time(epoch, args):
-    if args.train_only:
-        return False
-
-    # last epoch
-    if epoch == (args.epochs - 1):
-        return True
-
-    # test epoch
-    if (args.test_during_training and ((epoch % args.test_frequency) == 0)):
-        return True
-
-    # Else
-    return False
-
 
 def detect_cuda(args):
     if args.cuda and torch.cuda.is_available():
@@ -806,64 +791,6 @@ def detect_cuda(args):
         args.cuda = False
     return args
 
-
-def is_schedule_update_time(epoch, args):
-    # No scheduling
-    if args.loss != 'tvo':
-        return False
-
-    # First epoch, initalize
-    if epoch == 0:
-        return True
-
-    # Update happens at each minibatch
-    if args.per_sample is True:
-        return False
-
-    # Initalize once and never update
-    if args.schedule_update_frequency == 0:
-        return False
-
-    # catch checkpoint epoch
-    if (epoch % args.schedule_update_frequency) == 0:
-        return True
-
-    # Else
-    return False
-
-
-def is_checkpoint_time(epoch, args):
-    # No checkpointing
-    if args.checkpoint is False:
-        return False
-
-    # skip first epoch
-    if (epoch == 0):
-        return False
-
-    # catch last epoch
-    if epoch == (args.epochs - 1):
-        return True
-
-    # catch checkpoint epoch
-    if (epoch % args.checkpoint_frequency) == 0:
-        return True
-
-    # Else
-    return False
-
-
-def is_gradient_time(epoch, args):
-    # No checkpointing
-    if args.save_grads is False:
-        return False
-
-    # catch checkpoint epoch
-    if (epoch % args.test_frequency) == 0:
-        return True
-
-    # Else
-    return False
 
 
 def logaddexp(a, b):
