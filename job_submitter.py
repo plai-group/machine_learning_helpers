@@ -34,7 +34,7 @@ SRC_PATH       = ""
 DATA_DIR       = ""
 RESULTS_DIR    = ""
 
-SLEEP_TIME = 0.50
+SLEEP_TIME = 0.05
 
 REQUIRED_OPTIONS = set(["gpu", "hrs", "cpu", "mem", "partition", "env"])
 
