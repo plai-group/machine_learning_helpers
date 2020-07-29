@@ -43,10 +43,6 @@ persist_dir = Path('./.persistdir')
 def nested_dict():
     return defaultdict(nested_dict)
 
-
-
-
-
 """
 Loggers
 """
@@ -113,7 +109,7 @@ class MetricLogger(object):
         for k, v in kwargs.items():
             if isinstance(v, torch.Tensor):
                 v = v.item()
-            assert isinstance(v, (float, int))
+            assert isinstance(v, (float, int)), f'{k} is of type {type(v)}'
             self.meters[k].update(v)
         if self.wandb is not None:
             self.wandb.log(kwargs)
