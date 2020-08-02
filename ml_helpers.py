@@ -599,11 +599,13 @@ class BestMeter(object):
 
     """
 
-    def __init__(self, mode='max', verbose=True):
+    def __init__(self, name='value', mode='max', object_name='epoch', verbose=True):
 
         self.has_converged = False
         self.verbose = verbose
         self.mode = mode
+        self.name = name
+        self.obj_name = object_name
         self.best = None
         self.best_obj = None
         self.mode_worse = None  # the worse value for the chosen mode
@@ -613,21 +615,18 @@ class BestMeter(object):
     def _reset(self):
         self.best = self.mode_worse
 
-    def update(self, metrics, best_obj=None):
-        self.step(metrics, best_obj=None)
-
-    def step(self, metrics, best_obj=None):
+    def step(self, metrics, **kwargs):
         # convert `metrics` to float, in case it's a zero-dim Tensor
         current = float(metrics)
 
         if self.is_better(current, self.best):
+            self.best = current
+            self.best_obj = kwargs
             if self.verbose:
                 print("*********New best**********")
-                print("value: ", current)
-                print("object: ", best_obj)
+                print(f"{self.name}: ", current)
+                print(f"{self.best_obj}")
                 print("***************************")
-            self.best = current
-            self.best_obj = best_obj
             return True
 
         return False
