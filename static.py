@@ -1,10 +1,6 @@
-from string import Template
-
 UBC = 'ubc'
 CC  = 'cc'
 SUBMISSION_FILE_NAME = 'train.sh'
-
-# 'tags' ($cpu, $mem) are filled dynamically in job_submitter
 SLURM_TEMPLATE = f'''#!/bin/bash
 
 
@@ -32,6 +28,7 @@ virtualenv --no-download $SLURM_TMPDIR/env
 source $SLURM_TMPDIR/env/bin/activate
 pip install --no-index --upgrade pip
 pip install --no-index torch torchvision
+pip install git+git://github.com/pandas-dev/pandas.git@d9fff2792bf16178d4e450fe7384244e50635733
 pip install joblib sacred pymongo wandb tensorboard scikit-image sklearn
 $pip_install
 echo "Virutalenv created"
@@ -41,10 +38,14 @@ echo "Virutalenv created"
 CC_PIP_INSTALLS = {}
 
 CC_PIP_INSTALLS['ml3'] = f'''
+pip install ipdb joblib sacred pymongo wandb tensorboard scikit-image sklearn scikit-image tqdm seaborn
+'''
+
+CC_PIP_INSTALLS['tvo'] = f'''
 pip install GPy pyDOE scikit-image emukit tqdm seaborn python-Levenshtein nltk
 '''
+
 
 CC_PIP_INSTALLS['vodasafe'] = f'''
 pip install scikit_learn pillow tqdm imbalanced-learn torchvision pycocotools
 '''
-
