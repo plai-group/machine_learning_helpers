@@ -29,7 +29,7 @@ source $SLURM_TMPDIR/env/bin/activate
 pip install --no-index --upgrade pip
 pip install --no-index torch torchvision
 $pip_install
-export PYTHONPATH=/home/vadmas/.python:/home/vadmas/dev/packages:$PYTHONPATH
+pip install git+git://github.com/pandas-dev/pandas.git@d9fff2792bf16178d4e450fe7384244e50635733
 echo "Virutalenv created"
 '''
 
