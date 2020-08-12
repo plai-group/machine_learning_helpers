@@ -1,5 +1,6 @@
 from __future__ import division, print_function
 import errno
+from types import SimpleNamespace
 import json
 import os
 import pickle
@@ -41,6 +42,7 @@ persist_dir = Path('./.persistdir')
 
 def nested_dict():
     return defaultdict(nested_dict)
+
 
 """
 Loggers and Meters
@@ -764,7 +766,6 @@ def smooth(arr, window):
     return pd.Series(arr).rolling(window, min_periods=1).mean().values
 
 
-
 def detect_cuda(args):
     if args.cuda and torch.cuda.is_available():
         args.device = torch.device('cuda')
@@ -773,7 +774,6 @@ def detect_cuda(args):
         args.device = torch.device('cpu')
         args.cuda = False
     return args
-
 
 
 def logaddexp(a, b):
@@ -1074,3 +1074,30 @@ def get_unique_legend(axes):
             unique[label] = handle
     handles, labels = zip(*unique.items())
     return handles, labels
+
+
+def get_all_dirs(path):
+    return [p for p in Path(path).glob("*") if p.is_dir()]
+
+
+def get_frequency(y):
+    y = np.bincount(y)
+    ii = np.nonzero(y)[0]
+    return {k: v for k, v in zip(ii, y[ii])}
+
+
+def get_debug_args():
+    args = SimpleNamespace()
+    args.model_dir = './models'
+    args.data_dir = ''
+
+    # Training settings
+    args.epochs = 10
+    args.seed = 0
+    args.cuda = True
+    args.warmup = 5000
+    args.lr_max = 0.00005
+    args.eval_steps = 4
+    args.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    return args
