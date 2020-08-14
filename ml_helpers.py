@@ -50,9 +50,8 @@ Loggers and Meters
 
 
 # from the excellent https://github.com/pytorch/vision/blob/master/references/detection/utils.py
-class SmoothedValue(object):
-    """Track a series of values and provide access to smoothed values over a
-    window or the global series average.
+class Meter(object):
+    """Track a series of values and provide access to a number of metric
     """
 
     def __init__(self, window_size=20, fmt=None):
@@ -61,22 +60,46 @@ class SmoothedValue(object):
         self.deque = deque(maxlen=window_size)
         self.total = 0.0
         self.count = 0
+
+        self.M2   = 0
+        self.mean = 0
         self.fmt = fmt
 
-    def update(self, value, n=1):
+    def reset(self):
+        self.total = 0.0
+        self.count = 0
+        self.M2    = 0
+
+    def update(self, value):
         self.deque.append(value)
-        self.count += n
-        self.total += value * n
+        self.count += 1
+        self.total += value
+
+        # https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Welford's_online_algorithm
+        delta = value - self.mean
+        self.mean += delta / self.count
+        delta2 = value - self.mean
+        self.M2 += delta * delta2
+
+    @property
+    def var(self):
+        return self.M2 / self.count if self.count > 2 else 0
+
+    @property
+    def sample_var(self):
+        return self.M2 / (self.count - 1) if self.count > 2 else 0
 
     @property
     def median(self):
-        d = torch.tensor(list(self.deque))
-        return d.median().item()
+        return np.median(self.deque)
+
+    @property
+    def smoothed_avg(self):
+        return np.mean(self.deque)
 
     @property
     def avg(self):
-        d = torch.tensor(list(self.deque), dtype=torch.float32)
-        return d.mean().item()
+        return self.total / self.count
 
     @property
     def global_avg(self):
@@ -93,7 +116,7 @@ class SmoothedValue(object):
     def __str__(self):
         return self.fmt.format(
             median=self.median,
-            avg=self.avg,
+            avg=self.smoothed_avg,
             global_avg=self.global_avg,
             max=self.max,
             value=self.value)
@@ -101,7 +124,7 @@ class SmoothedValue(object):
 
 class MetricLogger(object):
     def __init__(self, delimiter=" ", header='', print_freq=1, wandb=None):
-        self.meters = defaultdict(SmoothedValue)
+        self.meters = defaultdict(Meter)
         self.delimiter = delimiter
         self.print_freq = print_freq
         self.header = header
@@ -139,8 +162,8 @@ class MetricLogger(object):
         i = 0
         start_time = time.time()
         end = time.time()
-        iter_time = SmoothedValue(fmt='{avg:.4f}')
-        data_time = SmoothedValue(fmt='{avg:.4f}')
+        iter_time = Meter(fmt='{avg:.4f}')
+        data_time = Meter(fmt='{avg:.4f}')
         space_fmt = ':' + str(len(str(len(iterable)))) + 'd'
         if torch.cuda.is_available():
             log_msg = self.delimiter.join([
@@ -186,99 +209,6 @@ class MetricLogger(object):
         total_time_str = str(timedelta(seconds=int(total_time)))
         print('{} Total time: {} ({:.4f} s / it)'.format(
             self.header, total_time_str, total_time / len(iterable)))
-
-
-class AverageMeter(object):
-    """
-    Computes and stores the average, var, and sample_var
-    Taken from https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Welford's_online_algorithm
-    """
-
-    def __init__(self):
-        self.keys = None
-        self.reset()
-
-    def reset(self):
-        self.count = 0
-        self.M2   = 0
-
-        self.mean = 0
-        self.variance = 0
-        self.sample_variance = 0
-
-    def update(self, val):
-        self.step(val)
-
-    def step(self, val):
-        val = self._type_check(val)
-
-        self.count += 1
-        delta = val - self.mean
-        self.mean += delta / self.count
-        delta2 = val - self.mean
-        self.M2 += delta * delta2
-
-        self.variance = self.M2 / self.count if self.count > 2 else 0
-        self.sample_variance = self.M2 / (self.count - 1) if self.count > 2 else 0
-
-    # this is to assure dicts and multidimensional arrays all work
-    def _type_check(self, val):
-        if isinstance(val, (float, int, np.ndarray, torch.Tensor)):
-            return val
-        if isinstance(val, (list)):
-            return numpyify(val)
-        if isinstance(val, (dict)):
-            val = numpyify(val)
-            if self.keys is None:
-                self.keys = list(val.keys())
-            else:
-                assert self.keys == list(val.keys()), f"keys don't match {self.keys}"
-            return np.array(list(val.values()))
-        else:
-            raise ValueError
-
-
-class MovingAverageMeter(object):
-    """Computes the  moving average of a given float."""
-
-    def __init__(self, name, fmt=':f', window=5):
-        self.name = "{} (window = {})".format(name, window)
-        self.fmt = fmt
-        self.N = window
-        self.history = []
-        self.val = None
-        self.reset()
-
-    def reset(self):
-        self.val = None
-        self.history = []
-
-    def update(self, val):
-        self.step(val)
-
-    def step(self, val):
-        self.history.append(val)
-        self.previous = self.val
-        if self.val is None:
-            self.val = val
-        else:
-            window = self.history[-self.N:]
-            self.val = sum(window) / len(window)
-            if len(window)  == self.N:
-                self.history == window
-        return self.val
-
-    @property
-    def relative_change(self):
-        if None not in [self.val, self.previous]:
-            relative_change = (self.previous - self.val) / self.previous
-            return relative_change
-        else:
-            return 0
-
-    def __str__(self):
-        fmtstr = '{name} {val' + self.fmt + '} ({avg' + self.fmt + '})'
-        return fmtstr.format(name=self.name, val=self.val, avg=self.relative_change)
 
 
 class ConvergenceMeter(object):
