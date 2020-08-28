@@ -517,18 +517,6 @@ def get_data_loader(dataset, batch_size, args, shuffle=True):
     return torch.utils.data.DataLoader(dataset=dataset, batch_size=batch_size, shuffle=shuffle, **kwargs)
 
 
-def get_mean_of_dataset(train_data_loader, args, idx=0):
-    """ Compute mean without loading entire dataset into memory """
-    meter = AverageMeter()
-    for i in train_data_loader:
-        if isinstance(i, list):
-            meter.update(i[idx])
-        else:
-            meter.update(i)
-    data_mean = meter.mean
-    if data_mean.ndim == 2: data_mean = data_mean.mean(0)
-    return tensor(data_mean, args)
-
 
 def split_train_test_by_percentage(dataset, train_percentage=0.8):
     """ split pytorch Dataset object by percentage """
