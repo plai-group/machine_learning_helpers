@@ -11,6 +11,8 @@ import time
 from collections import defaultdict, deque
 from datetime import datetime, timedelta
 from pathlib import Path
+from multiprocessing import Pool, cpu_count
+from tqdm import tqdm
 
 import joblib
 import numpy as np
@@ -517,19 +519,6 @@ def get_data_loader(dataset, batch_size, args, shuffle=True):
     return torch.utils.data.DataLoader(dataset=dataset, batch_size=batch_size, shuffle=shuffle, **kwargs)
 
 
-def get_mean_of_dataset(train_data_loader, args, idx=0):
-    """ Compute mean without loading entire dataset into memory """
-    meter = AverageMeter()
-    for i in train_data_loader:
-        if isinstance(i, list):
-            meter.update(i[idx])
-        else:
-            meter.update(i)
-    data_mean = meter.mean
-    if data_mean.ndim == 2: data_mean = data_mean.mean(0)
-    return tensor(data_mean, args)
-
-
 def split_train_test_by_percentage(dataset, train_percentage=0.8):
     """ split pytorch Dataset object by percentage """
     train_length = int(len(dataset) * train_percentage)
@@ -538,6 +527,14 @@ def split_train_test_by_percentage(dataset, train_percentage=0.8):
 
 def pmap(f, arr, n_jobs=-1, prefer='threads', verbose=10):
     return Parallel(n_jobs=n_jobs, prefer=prefer, verbose=verbose)(delayed(f)(i) for i in arr)
+
+def pmap_df(f, df, n_cores=cpu_count() - 1, n_chunks = 100):
+    # https://towardsdatascience.com/make-your-own-super-pandas-using-multiproc-1c04f41944a1
+    df_split = np.array_split(df, n_chunks)
+    with Pool(n_cores) as p:
+        results = list(tqdm(p.imap(f, df_split), total=len(df_split)))
+    df = pd.concat(results)
+    return df
 
 
 def put(value, filename):
