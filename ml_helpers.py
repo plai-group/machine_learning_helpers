@@ -528,8 +528,12 @@ def split_train_test_by_percentage(dataset, train_percentage=0.8):
 def pmap(f, arr, n_jobs=-1, prefer='threads', verbose=10):
     return Parallel(n_jobs=n_jobs, prefer=prefer, verbose=verbose)(delayed(f)(i) for i in arr)
 
-def pmap_df(f, df, n_cores=cpu_count() - 1, n_chunks = 100):
-    # https://towardsdatascience.com/make-your-own-super-pandas-using-multiproc-1c04f41944a1
+# https://towardsdatascience.com/make-your-own-super-pandas-using-multiproc-1c04f41944a1
+def pmap_df(f, df, n_cores=cpu_count() - 1, n_chunks = 100, is_notebook=True):
+    if is_notebook:
+        from tqdm.notebook import tqdm
+    else:
+        from tqdm import tqdm
     df_split = np.array_split(df, n_chunks)
     with Pool(n_cores) as p:
         results = list(tqdm(p.imap(f, df_split), total=len(df_split)))
