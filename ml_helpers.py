@@ -11,8 +11,8 @@ import time
 from collections import defaultdict, deque
 from datetime import datetime, timedelta
 from pathlib import Path
-from multiprocessing import Pool, cpu_count
-from tqdm import tqdm
+from multiprocessing import Pool
+from psutil import cpu_count
 
 import joblib
 import numpy as np
@@ -529,7 +529,7 @@ def pmap(f, arr, n_jobs=-1, prefer='threads', verbose=10):
     return Parallel(n_jobs=n_jobs, prefer=prefer, verbose=verbose)(delayed(f)(i) for i in arr)
 
 # https://towardsdatascience.com/make-your-own-super-pandas-using-multiproc-1c04f41944a1
-def pmap_df(f, df, n_cores=cpu_count() - 1, n_chunks = 100, is_notebook=True):
+def pmap_df(f, df, n_cores=cpu_count(logical=False), n_chunks = 100, is_notebook=True):
     if is_notebook:
         from tqdm.notebook import tqdm
     else:
@@ -619,9 +619,6 @@ def seed_all(seed, tf=False):
     random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
-    if tf:
-        import tensorflow as tf
-        tf.random.set_seed(seed)
 
 
 def get_grads(model):
