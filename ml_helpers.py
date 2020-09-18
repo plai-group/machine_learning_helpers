@@ -522,7 +522,8 @@ def get_data_loader(dataset, batch_size, args, shuffle=True):
 def split_train_test_by_percentage(dataset, train_percentage=0.8):
     """ split pytorch Dataset object by percentage """
     train_length = int(len(dataset) * train_percentage)
-    return torch.utils.data.random_split(dataset, (train_length, len(dataset) - train_length))
+    
+    # return torch.utils.data.random_split(dataset, (train_length, len(dataset) - train_length))
 
 
 def pmap(f, arr, n_jobs=-1, prefer='threads', verbose=10):

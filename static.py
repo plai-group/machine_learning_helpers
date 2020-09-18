@@ -37,7 +37,7 @@ echo "Virutalenv created"
 CC_PIP_INSTALLS = {}
 
 CC_PIP_INSTALLS['ml3'] = f'''
-pip install ipdb joblib sacred pymongo wandb tensorboard scikit-image sklearn scikit-image tqdm seaborn
+pip install ipdb joblib sacred pymongo wandb tensorboard scikit-image sklearn scikit-image tqdm seaborn sqlalchemy
 '''
 
 CC_PIP_INSTALLS['tvo'] = f'''
