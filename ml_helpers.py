@@ -553,8 +553,10 @@ def tqdm_joblib(tqdm_object):
 
 def pmap(f, arr, n_jobs=-1, notebook=False, **kwargs):
     _tqdm = tqdm_nb if notebook else tqdm
+    arr = list(arr)
     with tqdm_joblib(_tqdm(total=len(arr))) as progress_bar:
         return Parallel(n_jobs=n_jobs)(delayed(f)(i) for i in arr)
+
 
 # https://towardsdatascience.com/make-your-own-super-pandas-using-multiproc-1c04f41944a1
 def pmap_df(f, df, n_cores=cpu_count(logical=False), n_chunks = 100, is_notebook=True):
