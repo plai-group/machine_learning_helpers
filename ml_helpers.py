@@ -11,20 +11,13 @@ import time
 from collections import defaultdict, deque
 from datetime import datetime, timedelta
 from pathlib import Path
-from multiprocessing import Pool
-from psutil import cpu_count
 
-import contextlib
 import joblib
-from tqdm import tqdm
-from tqdm.notebook import tqdm as tqdm_nb
-from joblib import Parallel, delayed
 
 import numpy as np
 import pandas as pd
 import torch
-import torch.distributed as dist
-from joblib import Parallel, delayed
+
 from sklearn import metrics
 from torch._six import inf
 
@@ -448,20 +441,16 @@ def mkdir(path):
         if e.errno != errno.EEXIST:
             raise
 
-# https://stackoverflow.com/questions/10823877/what-is-the-fastest-way-to-flatten-arbitrarily-nested-lists-in-python
-
-
 def flatten(container):
+    """https://stackoverflow.com/questions/10823877/what-is-the-fastest-way-to-flatten-arbitrarily-nested-lists-in-python"""
     for i in container:
         if isinstance(i, (list, tuple)):
             yield from flatten(i)
         else:
             yield i
 
-# https://codereview.stackexchange.com/questions/185785/scale-numpy-array-to-certain-range
-
-
 def scale(x, out_range=(-1, 1)):
+    """ https://codereview.stackexchange.com/questions/185785/scale-numpy-array-to-certain-range"""
     domain = np.min(x), np.max(x)
     y = (x - (domain[1] + domain[0]) / 2) / (domain[1] - domain[0])
     return y * (out_range[1] - out_range[0]) + (out_range[1] + out_range[0]) / 2
@@ -530,45 +519,6 @@ def split_train_test_by_percentage(dataset, train_percentage=0.8):
     """ split pytorch Dataset object by percentage """
     train_length = int(len(dataset) * train_percentage)
     return torch.utils.data.random_split(dataset, (train_length, len(dataset) - train_length))
-
-@contextlib.contextmanager
-def tqdm_joblib(tqdm_object):
-    # from https://stackoverflow.com/questions/24983493/tracking-progress-of-joblib-parallel-execution/49950707
-    """Context manager to patch joblib to report into tqdm progress bar given as argument"""
-    class TqdmBatchCompletionCallback(joblib.parallel.BatchCompletionCallBack):
-        def __init__(self, *args, **kwargs):
-            super().__init__(*args, **kwargs)
-
-        def __call__(self, *args, **kwargs):
-            tqdm_object.update(n=self.batch_size)
-            return super().__call__(*args, **kwargs)
-
-    old_batch_callback = joblib.parallel.BatchCompletionCallBack
-    joblib.parallel.BatchCompletionCallBack = TqdmBatchCompletionCallback
-    try:
-        yield tqdm_object
-    finally:
-        joblib.parallel.BatchCompletionCallBack = old_batch_callback
-        tqdm_object.close()
-
-def pmap(f, arr, n_jobs=-1, notebook=False, **kwargs):
-    _tqdm = tqdm_nb if notebook else tqdm
-    arr = list(arr)
-    with tqdm_joblib(_tqdm(total=len(arr))) as progress_bar:
-        return Parallel(n_jobs=n_jobs)(delayed(f)(i) for i in arr)
-
-
-# https://towardsdatascience.com/make-your-own-super-pandas-using-multiproc-1c04f41944a1
-def pmap_df(f, df, n_cores=cpu_count(logical=False), n_chunks = 100, is_notebook=True):
-    if is_notebook:
-        from tqdm.notebook import tqdm
-    else:
-        from tqdm import tqdm
-    df_split = np.array_split(df, n_chunks)
-    with Pool(n_cores) as p:
-        results = list(tqdm(p.imap(f, df_split), total=len(df_split)))
-    df = pd.concat(results)
-    return df
 
 
 def put(value, filename):
@@ -642,7 +592,7 @@ def exponentiate_and_normalize(values, dim=0):
     return torch.exp(lognormexp(values, dim=dim))
 
 
-def seed_all(seed, tf=False):
+def seed_all(seed):
     """Seed all devices deterministically off of seed and somewhat
     independently."""
     np.random.seed(seed)
@@ -832,10 +782,6 @@ def highlight_best(df, col):
     best = df[col].max()
     return df.style.apply(lambda x: ['background: lightgreen' if (x[col] == best) else '' for i in x], axis=1)
 
-
-def filter_uninteresting(df):
-    df = df.dropna(1, how='all')
-    return df[[i for i in df if len(set(df[i])) > 1]]
 
 
 """
