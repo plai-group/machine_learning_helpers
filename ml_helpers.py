@@ -1,5 +1,6 @@
 from __future__ import division, print_function
 import errno
+from pprint import pprint
 from types import SimpleNamespace
 import json
 import os
@@ -868,3 +869,19 @@ def get_debug_args():
     args.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     return args
+
+
+def default_init(args):
+    if isinstance(args, dict):
+        args = SimpleNamespace(**args)
+    seed_all(args.seed)
+    args = detect_cuda(args)
+    args.home_dir = str(Path(args.home_dir).absolute())
+    pprint(args.__dict__)
+    return args
+
+def join_path(*args):
+    return str(Path("/".join(args))) # trick to remove multiple backslashes
+
+def add_home(home_dir, *args):
+    return [join_path(home_dir, p) for p in args]

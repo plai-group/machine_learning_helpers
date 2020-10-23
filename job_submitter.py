@@ -206,7 +206,7 @@ def make_commands(hyper_string, experiment_name, job_idx, file_storage_observer)
     artifact_dir = job_dir / 'artifacts'
     artifact_dir.mkdir(exist_ok=False, parents=True)
 
-    python_command = f"python $HOME_DIR/{SRC_PATH} with data_dir=$HOME_DIR/data artifact_dir=$JOB_DIR/artifacts {hyper_string} --name {experiment_name}"
+    python_command = f"python $HOME_DIR/{SRC_PATH} with home_dir=$HOME_DIR artifact_dir=$JOB_DIR/artifacts {hyper_string} -p --name {experiment_name}"
 
     if file_storage_observer or (HOST == static.CC):
         python_command = f"{python_command} -F $JOB_DIR/file_storage_observer"
