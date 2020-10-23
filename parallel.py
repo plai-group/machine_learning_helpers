@@ -1,9 +1,7 @@
 import contextlib
 import joblib
-from psutil import cpu_count
 from tqdm import tqdm
 import numpy as np
-from multiprocessing import Pool
 import pandas as pd
 from tqdm.notebook import tqdm as tqdm_nb
 from joblib import Parallel, delayed
@@ -30,16 +28,12 @@ def tqdm_joblib(tqdm_object):
 
 def pmap(f, arr, n_jobs=-1, notebook=False, **kwargs):
     _tqdm = tqdm_nb if notebook else tqdm
-    arr = list(arr)
+    arr = list(arr) # convert generators to list so tqdm work
     with tqdm_joblib(_tqdm(total=len(arr))) as progress_bar:
         return Parallel(n_jobs=n_jobs, **kwargs)(delayed(f)(i) for i in arr)
 
-def pmap_df(f, df, n_jobs=-1, n_chunks = 100, notebook=True):
+def pmap_df(f, df, n_chunks = 100, **kwargs):
     # https://towardsdatascience.com/make-your-own-super-pandas-using-multiproc-1c04f41944a1
-    if notebook:
-        from tqdm.notebook import tqdm
-    else:
-        from tqdm import tqdm
     df_split = np.array_split(df, n_chunks)
-    df = pd.concat(pmap(f, df_split, n_jobs=n_jobs, notebook=notebook))
+    df = pd.concat(pmap(f, df_split, **kwargs))
     return df
