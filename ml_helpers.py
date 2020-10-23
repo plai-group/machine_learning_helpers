@@ -1,4 +1,5 @@
 from __future__ import division, print_function
+from sklearn.model_selection import train_test_split
 import errno
 from pprint import pprint
 from types import SimpleNamespace
@@ -520,6 +521,19 @@ def split_train_test_by_percentage(dataset, train_percentage=0.8):
     """ split pytorch Dataset object by percentage """
     train_length = int(len(dataset) * train_percentage)
     return torch.utils.data.random_split(dataset, (train_length, len(dataset) - train_length))
+
+def train_test_val(data, splits=(0.7,0.2,0.1)):
+    train_p, test_p, val_p = splits
+    train, testval = train_test_split(data, train_size=train_p)
+    if val_p == 0:
+        return train, testval
+    else:
+        test, val = train_test_split(testval, train_size=test_p/(test_p+val_p))
+    return train, test, val
+
+def group_train_test_val(data: pd.DataFrame, group: str, **kwargs):
+    groups = data[group]
+    return [data[groups.isin(split)] for split in train_test_val(groups.unique(), **kwargs)]
 
 
 def put(value, filename):
