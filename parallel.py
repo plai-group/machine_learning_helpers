@@ -5,6 +5,8 @@ import numpy as np
 import pandas as pd
 from tqdm.notebook import tqdm as tqdm_nb
 from joblib import Parallel, delayed
+from sklearn.model_selection import GroupKFold
+
 
 @contextlib.contextmanager
 def tqdm_joblib(tqdm_object):
@@ -26,14 +28,18 @@ def tqdm_joblib(tqdm_object):
         joblib.parallel.BatchCompletionCallBack = old_batch_callback
         tqdm_object.close()
 
-def pmap(f, arr, n_jobs=-1, notebook=False, **kwargs):
+def pmap(f, arr, n_jobs=-1, notebook=True, **kwargs):
     _tqdm = tqdm_nb if notebook else tqdm
-    arr = list(arr) # convert generators to list so tqdm work
+    arr = list(arr) # convert generators to list so tqdm works
     with tqdm_joblib(_tqdm(total=len(arr))) as progress_bar:
         return Parallel(n_jobs=n_jobs, **kwargs)(delayed(f)(i) for i in arr)
 
-def pmap_df(f, df, n_chunks = 100, **kwargs):
+def pmap_df(f, df, n_chunks = 100, group_col=None, **kwargs):
     # https://towardsdatascience.com/make-your-own-super-pandas-using-multiproc-1c04f41944a1
-    df_split = np.array_split(df, n_chunks)
+    if group_col:
+        group_kfold = GroupKFold(n_splits=n_chunks)
+        df_split = [df.iloc[test_index]  for _, test_index in group_kfold.split(df, groups=df[group_col])]
+    else:
+        df_split = np.array_split(df, n_chunks)
     df = pd.concat(pmap(f, df_split, **kwargs))
     return df
