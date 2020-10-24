@@ -7,6 +7,7 @@ archive/
 discrete_vi/
 bkup/
 results/
+untested.py
 .vscode
 # Byte-compiled / optimized / DLL files
 __pycache__/
