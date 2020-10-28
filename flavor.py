@@ -37,5 +37,6 @@ def pgroupby(df, groups, f,  **kwargs):
     # pmap groups
     out = pmap(f, df_split, **kwargs)
     # reassemble and return
+    groups = [groups] if isinstance(groups, str) else groups
     return pd.concat([pd.concat({k: v}, names=groups) for k, v in zip(names, out)])
 
