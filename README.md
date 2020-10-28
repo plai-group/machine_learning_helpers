@@ -4,6 +4,6 @@ To have these helpers be globally available for all your projects, create a hidd
 
 `export PYTHONPATH=~/.python:$PYTHONPATH`
 
-For notebooks, store your boilerplate code in `init.ipynb` and run 
+Then you can use `import ml_helpers as mlh` in all your projects. For notebooks, store your boilerplate code in `init.ipynb` and run 
 
 `%run ~/.python/init` at the beginning of each new notebook.
