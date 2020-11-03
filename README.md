@@ -8,6 +8,8 @@ For notebooks, store your boilerplate code in `init.ipynb` and run
 
 `%run ~/.python/init` at the beginning of each new notebook.
 
+Then you can use `import ml_helpers as mlh` in all your projects. For notebooks, store your boilerplate code in `init.ipynb` and run `%run ~/.python/init` at the beginning of each new notebook.
+
 ---
 
 # Job submission script instructions
