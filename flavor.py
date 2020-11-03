@@ -23,6 +23,20 @@ def remove_boring(df):
 def ppipe(df, f, **kwargs):
     return pmap_df(f, df, **kwargs)
 
+@pf.register_dataframe_method
+def str_get_numbers(df, column_name: str):
+    """Wrapper around df.str.replace"""
+
+    df[column_name] = df[column_name].str.extract('(\d+)', expand=False)
+    return df
+
+@pf.register_dataframe_method
+def str_drop_after(df, pat, column_name: str):
+    """Wrapper around df.str.replace"""
+
+    df[column_name] = df[column_name].str.split(pat='[', expand=True)
+    return df
+
 # collapse_levels(sep='_')
 # @pf.register_dataframe_method
 # def flatten_cols(df):
