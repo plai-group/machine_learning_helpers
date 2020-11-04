@@ -34,11 +34,11 @@ def pmap(f, arr, n_jobs=-1, notebook=True, **kwargs):
     with tqdm_joblib(_tqdm(total=len(arr))) as progress_bar:
         return Parallel(n_jobs=n_jobs, **kwargs)(delayed(f)(i) for i in arr)
 
-def pmap_df(f, df, n_chunks = 100, group_col=None, **kwargs):
+def pmap_df(f, df, n_chunks = 100, groups=None, **kwargs):
     # https://towardsdatascience.com/make-your-own-super-pandas-using-multiproc-1c04f41944a1
-    if group_col:
+    if groups:
         group_kfold = GroupKFold(n_splits=n_chunks)
-        df_split = [df.iloc[test_index]  for _, test_index in group_kfold.split(df, groups=df[group_col])]
+        df_split = [df.iloc[test_index]  for _, test_index in group_kfold.split(df, groups=df[groups])]
     else:
         df_split = np.array_split(df, n_chunks)
     df = pd.concat(pmap(f, df_split, **kwargs))
