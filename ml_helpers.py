@@ -1,11 +1,9 @@
 from __future__ import division, print_function
 from sklearn.model_selection import train_test_split
-import errno
 from pprint import pprint
 from types import SimpleNamespace
 import json
 import os
-import pickle
 import random
 import socket
 import sys
@@ -407,24 +405,6 @@ class BestMeter(object):
         self.mode = mode
 
 
-def save_model(args):
-    torch.save(args.model.state_dict(),
-               os.path.join(args.wandb.run.dir, "model.h5"))
-
-
-
-def collate_fn(batch):
-    return tuple(zip(*batch))
-
-
-def one_vs_all_cv(mylist):
-    folds = []
-    for i in range(len(mylist)):
-        train = mylist.copy()
-        test = [train.pop(i)]
-        folds += [(train, test)]
-    return folds
-
 
 def warmup_lr_scheduler(optimizer, warmup_iters, warmup_factor):
     def f(x):
@@ -435,13 +415,6 @@ def warmup_lr_scheduler(optimizer, warmup_iters, warmup_factor):
 
     return torch.optim.lr_scheduler.LambdaLR(optimizer, f)
 
-
-def mkdir(path):
-    try:
-        os.makedirs(path)
-    except OSError as e:
-        if e.errno != errno.EEXIST:
-            raise
 
 def flatten(container):
     """https://stackoverflow.com/questions/10823877/what-is-the-fastest-way-to-flatten-arbitrarily-nested-lists-in-python"""
@@ -464,7 +437,6 @@ def hits_and_misses(y_hat, y_testing):
     fp = sum(y_hat - y_testing > 0)
     fn = sum(y_testing - y_hat > 0)
     return tp, tn, fp, fn
-
 
 def get_auc(roc):
     prec = roc['prec'].fillna(1)
@@ -685,124 +657,9 @@ def safe_json_load(path):
     return res
 
 
-def get_experiments_from_fs(path):
-    path = Path(path)
-    assert (path / '_sources/').exists(), f"Bad path: {path}"
-    exps = {}
-    dfs = []
-
-    for job in path.glob("*"):
-        if job.parts[-1] in ['_resources', '_sources']:
-            continue
-        job_id = job.parts[-1]
-
-        run = safe_json_load(job / 'run.json')
-        config = safe_json_load(job / 'config.json')
-        metrics = safe_json_load(job / 'metrics.json')
-
-        exps[job_id] = {**config, **run}
-
-        if metrics:
-            for metric, v in metrics.items():
-                df = pd.DataFrame(v)
-                df.index = pd.MultiIndex.from_product([[job_id], [metric], df.index], names=['_id', 'metric', 'index'])
-                dfs += [df]
-
-    exps = pd.DataFrame(exps).T
-    exps.index.name = '_id'
-    if dfs:
-        df = pd.concat(dfs).drop('timestamps', axis=1)
-    else:
-        df = None
-    return exps, df
-
-
-def get_experiments_from_dir(path, observer_name="file_storage_observer", prune=PRUNE_COLUMNS):
-    path = Path(path)
-    assert path.exists(), f'Bad path: {path}'
-    exps = {}
-    dfs = {}
-    for p in path.rglob(observer_name):
-        _id = str(p).replace(f"/{observer_name}", "")
-        exp, df = get_experiments_from_fs(p)
-        exps[_id] = exp
-        if df is None:
-            print(f"{p} returned empty df")
-        else:
-            dfs[_id] = df
-
-    if exps and dfs:
-        exps = pd.concat(exps.values(), keys=exps.keys()).droplevel(1)
-        dfs = pd.concat(dfs.values(), keys=dfs.keys()).droplevel(1)
-
-        exps.index.name = '_id'
-        dfs.index.names = ['_id', 'metric', 'index']
-    else:
-        raise ValueError(f"results empty! path:{path}")
-
-    if prune:
-        exps = exps.remove_columns([c for c in prune if c in exps.columns])
-    return exps, dfs
-
-
-def post_process(exp, df, CUTOFF_EPOCH=2000):
-    print(f"{exp[exp.status == 'COMPLETED'].shape[0]} jobs completed")
-    print(f"{exp[exp.status == 'RUNNING'].shape[0]} jobs timed out")
-    print(f"{exp[exp.status == 'FAILED'].shape[0]} jobs failed")
-
-    # Remove jobs that failed
-    exp = exp[exp.status != 'FAILED']
-
-    df = df[df.steps <= CUTOFF_EPOCH]
-
-    # get values at last epoch
-    results_at_cutoff = df[df.steps == CUTOFF_EPOCH].reset_index().pivot(index='_id', columns='metric', values='values')
-
-    # join
-    exp = exp.join(results_at_cutoff, how='outer')
-    return exp, df
-
-
-def process_dictionary_column(df, column_name):
-    if column_name in df.columns:
-        return (df
-                .join(df[column_name].apply(pd.Series))
-                .drop(column_name, 1))
-    else:
-        return df
-
-
-def process_tuple_column(df, column_name, output_column_names):
-    if column_name in df.columns:
-        return df.drop(column_name, 1).assign(**pd.DataFrame(df[column_name].values.tolist(), index=df.index))
-    else:
-        return df
-
-
-def process_list_column(df, column_name, output_column_names):
-    if column_name in df.columns:
-        new = pd.DataFrame(df[column_name].values.tolist(), index=df.index, columns=output_column_names)
-        old = df.drop(column_name, 1)
-        return old.merge(new, left_index=True, right_index=True)
-    else:
-        return df
-
-
-def show_uniques(df):
-    for col in df:
-        print(f'{col}: ', df[col].unique())
-
-
-def highlight_best(df, col):
-    best = df[col].max()
-    return df.style.apply(lambda x: ['background: lightgreen' if (x[col] == best) else '' for i in x], axis=1)
-
-
-
 """
 Safe initalizers
 """
-
 
 def tensor(data, args=None, dtype=torch.float, device=torch.device('cpu')):
     if args is not None:
