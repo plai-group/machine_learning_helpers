@@ -592,28 +592,49 @@ def get_grads(model):
     return torch.cat([torch.flatten(p.grad.clone()) for p in model.parameters()]).cpu()
 
 
-def log_ess(log_weight):
-    """Log of Effective sample size.
-    Args:
-        log_weight: Unnormalized log weights
-            torch.Tensor [batch_size, S] (or [S])
-    Returns: log of effective sample size [batch_size] (or [1])
-    """
-    dim = 1 if log_weight.ndimension() == 2 else 0
+def ESS(x):
+    """ Compute the effective sample size of estimand of interest. Vectorised implementation
+        from: https://jwalton.info/Efficient-effective-sample-size-python/
+     """
+    if x.shape[0] > x.shape[1]:
+        x = x.T
 
-    return 2 * torch.logsumexp(log_weight, dim=dim) - \
-        torch.logsumexp(2 * log_weight, dim=dim)
+    m_chains, n_iters = x.shape
 
+    variogram = lambda t: ((x[:, t:] - x[:, :(n_iters - t)])**2).sum() / (m_chains * (n_iters - t))
 
-def ess(log_weight):
-    """Effective sample size.
-    Args:
-        log_weight: Unnormalized log weights
-            torch.Tensor [batch_size, S] (or [S])
-    Returns: effective sample size [batch_size] (or [1])
-    """
+    post_var = gelman_rubin(x)
 
-    return torch.exp(log_ess(log_weight))
+    t = 1
+    rho = np.ones(n_iters)
+    negative_autocorr = False
+
+    # Iterate until the sum of consecutive estimates of autocorrelation is negative
+    while not negative_autocorr and (t < n_iters):
+        rho[t] = 1 - variogram(t) / (2 * post_var)
+
+        if not t % 2:
+            negative_autocorr = sum(rho[t-1:t+1]) < 0
+
+        t += 1
+
+    return int(m_chains*n_iters / (1 + 2*rho[1:t].sum()))
+
+def gelman_rubin(x):
+    """ Estimate the marginal posterior variance. Vectorised implementation. """
+    m_chains, n_iters = x.shape
+
+    # Calculate between-chain variance
+    B_over_n = ((np.mean(x, axis=1) - np.mean(x))**2).sum() / (m_chains - 1)
+
+    # Calculate within-chain variances
+    W = ((x - x.mean(axis=1, keepdims=True))**2).sum() / (m_chains*(n_iters - 1))
+
+    # (over) estimate of variance
+    s2 = W * (n_iters - 1) / n_iters + B_over_n
+
+    return s2
+
 
 
 def get_unique_dir(comment=None):
