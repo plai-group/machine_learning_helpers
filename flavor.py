@@ -21,6 +21,11 @@ def remove_boring(df):
     return df[[i for i in df if len(set(df[i])) > 1]]
 
 @pf.register_dataframe_method
+@pf.register_series_method
+def add_outer_index(df, value, name):
+    return pd.concat({value: df}, names=[name])
+
+@pf.register_dataframe_method
 def ppipe(df, f, **kwargs):
     return pmap_df(f, df, **kwargs)
 
@@ -100,3 +105,71 @@ def pgroupby(df, groups, f,  **kwargs):
     groups = [groups] if isinstance(groups, str) else groups
     return pd.concat([pd.concat({k: v}, names=groups) for k, v in zip(names, out)])
 
+
+# from https://pyjanitor.readthedocs.io/notebooks/anime.html
+
+@pf.register_dataframe_method
+def str_remove(df, column_name: str, pat: str, *args, **kwargs):
+    """Wrapper around df.str.replace"""
+
+    df[column_name] = df[column_name].str.replace(pat, "", *args, **kwargs)
+    return df
+
+
+@pf.register_dataframe_method
+def str_replace(df, column_name: str, pat_from: str, pat_to: str,  *args, **kwargs):
+    """Wrapper around df.str.replace"""
+
+    df[column_name] = df[column_name].str.replace(pat_from, pat_to, *args, **kwargs)
+    return df
+
+
+
+@pf.register_dataframe_method
+def str_trim(df, column_name: str, *args, **kwargs):
+    """Wrapper around df.str.strip"""
+
+    df[column_name] = df[column_name].str.strip(*args, **kwargs)
+    return df
+
+
+@pf.register_dataframe_method
+def str_word(
+    df,
+    column_name: str,
+    start: int = None,
+    stop: int = None,
+    pat: str = " ",
+    *args,
+    **kwargs
+):
+    """
+    Wrapper around `df.str.split` with additional `start` and `end` arguments
+    to select a slice of the list of words.
+    """
+
+    df[column_name] = df[column_name].str.split(pat).str[start:stop]
+    return df
+
+
+@pf.register_dataframe_method
+def str_join(df, column_name: str, sep: str, *args, **kwargs):
+    """
+    Wrapper around `df.str.join`
+    Joins items in a list.
+    """
+
+    df[column_name] = df[column_name].str.join(sep)
+    return df
+
+
+@pf.register_dataframe_method
+def str_slice(
+    df, column_name: str, start: int = None, stop: int = None, *args, **kwargs
+):
+    """
+    Wrapper around `df.str.slice
+    """
+
+    df[column_name] = df[column_name].str[start:stop]
+    return df
