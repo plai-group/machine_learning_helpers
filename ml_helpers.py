@@ -20,8 +20,7 @@ import torch
 
 from sklearn import metrics
 from torch._six import inf
-
-
+from parallel import pmap, pmap_df
 
 PRUNE_COLUMNS = [
     '__doc__',

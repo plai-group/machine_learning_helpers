@@ -1,10 +1,11 @@
 import contextlib
 import joblib
-from tqdm import tqdm
+# from tqdm import tqdm
+# from tqdm.notebook import tqdm as tqdm_nb
 import numpy as np
 import pandas as pd
 import janitor
-from tqdm.notebook import tqdm as tqdm_nb
+from tqdm.auto import tqdm
 from joblib import Parallel, delayed
 from sklearn.model_selection import GroupKFold
 
@@ -29,10 +30,9 @@ def tqdm_joblib(tqdm_object):
         joblib.parallel.BatchCompletionCallBack = old_batch_callback
         tqdm_object.close()
 
-def pmap(f, arr, n_jobs=-1, notebook=True, **kwargs):
-    _tqdm = tqdm_nb if notebook else tqdm
+def pmap(f, arr, n_jobs=-1, **kwargs):
     arr = list(arr) # convert generators to list so tqdm works
-    with tqdm_joblib(_tqdm(total=len(arr))) as progress_bar:
+    with tqdm_joblib(tqdm(total=len(arr))) as progress_bar:
         return Parallel(n_jobs=n_jobs, **kwargs)(delayed(f)(i) for i in arr)
 
 def pmap_df(f, df, n_chunks = 100, groups=None, **kwargs):
