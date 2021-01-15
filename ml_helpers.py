@@ -526,6 +526,8 @@ def smooth(arr, window):
 
 
 def detect_cuda(args):
+    if "cuda" not in args.__dict__:
+        return args
     if args.cuda and torch.cuda.is_available():
         args.device = torch.device('cuda')
         args.cuda = True
