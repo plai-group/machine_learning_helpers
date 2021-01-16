@@ -12,10 +12,12 @@ from itertools import chain
 import static
 import socket
 import subprocess
+import uuid
 
 # Global Arguments
 COMPUTE_CANADA_HOSTS = ['cedar{}.cedar.computecanada.ca'.format(i) for i in range(10)]
 UBC_SLURM_HOSTS = ['borg.cs.ubc.ca']
+UBC_PLAI_SCRATCH_ARTIFACTS = "/ubc/cs/research/plai-scratch/vadmas/artifacts"
 
 hostname = socket.gethostname()
 
@@ -45,7 +47,6 @@ REQUIRED_OPTIONS = set(["gpu", "hrs", "cpu", "mem", "partition", "env"])
 def submit(hyper_params,
            experiment_name,
            experiment_dir,
-           manual_mode=False,
            file_storage_observer=False,
            script_name="main.py",
            prune_successful='',
@@ -76,8 +77,12 @@ def submit(hyper_params,
         if flag in ['yes', 'all', 'y', 'a']:
             scheduler_command, python_command, job_dir = make_commands(hyper_string, experiment_name, idx, file_storage_observer)
             make_bash_script(python_command, static.SUBMISSION_FILE_NAME, job_dir, **kwargs)
-            output = subprocess.check_output(scheduler_command,  stderr=subprocess.STDOUT, shell=True)
-            print("Submitting ({}/{}): {}".format(idx + 1, len(hypers), output.strip().decode()))
+            try:
+                output = subprocess.check_output(scheduler_command,  stderr=subprocess.STDOUT, shell=True)
+                print("Submitting ({}/{}): {}".format(idx + 1, len(hypers), output.strip().decode()))
+            except subprocess.CalledProcessError as e:
+                print(e.output.decode('UTF-8'))
+                sys.exit(1)
         if flag in ['all', 'a']:
             ask = False
             time.sleep(SLEEP_TIME)
@@ -204,7 +209,13 @@ def make_commands(hyper_string, experiment_name, job_idx, file_storage_observer)
     job_dir.mkdir(exist_ok=False, parents=True)
 
     artifact_dir = job_dir / 'artifacts'
-    artifact_dir.mkdir(exist_ok=False, parents=True)
+
+    if HOST == static.CC:
+        artifact_dir.mkdir(exist_ok=False, parents=True)
+    else:
+        src = Path(UBC_PLAI_SCRATCH_ARTIFACTS) / str(uuid.uuid1())
+        src.mkdir(exist_ok=True, parents=True)
+        os.symlink(src, artifact_dir, target_is_directory=True)
 
     python_command = f"python $HOME_DIR/{SRC_PATH} with home_dir=$HOME_DIR artifact_dir=$JOB_DIR/artifacts {hyper_string} -p --name {experiment_name}"
 
@@ -221,4 +232,3 @@ def make_commands(hyper_string, experiment_name, job_idx, file_storage_observer)
     scheduler_command = f"sbatch -o {res_name} -e {err_name} -J {experiment_name} --export=ALL {static.SUBMISSION_FILE_NAME}"
 
     return scheduler_command, python_command, job_dir
-
