@@ -43,6 +43,28 @@ def str_drop_after(df, pat, column_name: str):
     df[column_name] = df[column_name].str.split(pat='[', expand=True)
     return df
 
+@pf.register_dataframe_method
+def expand_list_column(df, column_name, output_column_names):
+    """
+
+    #     AMOUNT    LISTCOL
+    #     0       [1,2,3]
+    #     1       [1,2,3]
+    #     2       [1,2,3]
+
+    to
+
+    #     AMOUNT  col_1     col_2    col_3
+    #     0       1           2         3
+    #     1       1           2         3
+    #     2       1           2         3
+    """
+
+    new = pd.DataFrame(df[column_name].values.tolist(), index=df.index, columns=output_column_names)
+    old = df.drop(column_name, 1)
+    return old.merge(new, left_index=True, right_index=True)
+
+
 # collapse_levels(sep='_')
 # @pf.register_dataframe_method
 # def flatten_cols(df):
@@ -90,6 +112,7 @@ def str_drop_after(df, pat, column_name: str):
 # def filter_uninteresting(df):
 #     df = df.dropna(1, how='all')
 #     return df[[i for i in df if len(set(df[i])) > 1]]
+
 def pgroupby(df, groups, f,  **kwargs):
     '''# mirror groupby order (group then agg)
     replace:
