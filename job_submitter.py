@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import argparse
 import os
 from string import Template
 import time
@@ -36,6 +37,9 @@ SRC_PATH       = ""
 DATA_DIR       = ""
 RESULTS_DIR    = ""
 
+ARGSPARSE      = False
+SINGULARITY    = False
+
 SLEEP_TIME = 0.05
 
 REQUIRED_OPTIONS = set(["gpu", "hrs", "cpu", "mem", "partition", "env"])
@@ -47,13 +51,19 @@ REQUIRED_OPTIONS = set(["gpu", "hrs", "cpu", "mem", "partition", "env"])
 def submit(hyper_params,
            experiment_name,
            experiment_dir,
-           file_storage_observer=False,
            script_name="main.py",
            prune_successful='',
+           argsparse=False,
+           singularity=False,
            **kwargs):
 
     # Validate arguments
-    verify_dirs(experiment_dir, experiment_name, script_name)
+    verify_dirs(experiment_dir,
+                experiment_name,
+                script_name,
+                argsparse,
+                singularity
+                )
 
     # Display info
     hypers = process_hyperparameters(hyper_params, prune_successful)
@@ -75,7 +85,7 @@ def submit(hyper_params,
         if ask:
             flag = input("Submit ({}/{}): {}? (y/n/all/exit) ".format(idx + 1, len(hypers), hyper_string))
         if flag in ['yes', 'all', 'y', 'a']:
-            scheduler_command, python_command, job_dir = make_commands(hyper_string, experiment_name, idx, file_storage_observer)
+            scheduler_command, python_command, job_dir = make_commands(hyper_string, experiment_name, idx)
             make_bash_script(python_command, static.SUBMISSION_FILE_NAME, job_dir, **kwargs)
             try:
                 output = subprocess.check_output(scheduler_command,  stderr=subprocess.STDOUT, shell=True)
@@ -96,7 +106,7 @@ def submit(hyper_params,
 ########################
 
 # Strictly enforce directory structure
-def verify_dirs(experiment_dir, experiment_name, script_name):
+def verify_dirs(experiment_dir, experiment_name, script_name, argsparse, singularity):
     project_dir    = Path(experiment_dir).parents[1]
     src_path       = Path(project_dir) / script_name
     data_dir       = Path(project_dir) / 'data'
@@ -112,12 +122,15 @@ def verify_dirs(experiment_dir, experiment_name, script_name):
     global EXPERIMENT_DIR
     global SRC_PATH
     global RESULTS_DIR
+    global ARGSPARSE
+    global SINGULARITY
 
     PROJECT_DIR = project_dir
     EXPERIMENT_DIR = experiment_dir
     SRC_PATH = f"{script_name}"
     RESULTS_DIR = f'results/{experiment_name}/{now.strftime("%Y_%m_%d_%H:%M:%S")}'
-
+    ARGSPARSE = argsparse
+    SINGULARITY = singularity
 
 #################################
 # ------- hyperparameters -------
@@ -154,12 +167,13 @@ def make_hyper_string_from_dict(hyper_dict, df):
             return [value]
 
     hyper_dict = {key: type_check(value) for key, value in hyper_dict.items()}
-
+    connect_string = "--{}={} " if ARGSPARSE else "'{}={}' "
     commands = []
     for args in itertools.product(*hyper_dict.values()):
         header = list(zip(hyper_dict.keys(), args))
         if verify_header(header, df):
-            command = "".join(["'{}={}' ".format(k, v) for k, v in header])
+
+            command = "".join([connect_string.format(k, v) for k, v in header])
             commands.append(command[:-1])
         else:
             print(f"skipping: {header}")
@@ -183,6 +197,7 @@ def make_bash_script(python_command, file_name, job_dir, **kwargs):
     if "exclude" in kwargs:
         myfile = add_slurm_option(myfile, "#SBATCH --exclude=" + ",".join(kwargs['exclude']))
 
+    # ugly, fix later
     if HOST == static.UBC:
         myfile = add_slurm_option(myfile, f"#SBATCH --partition={kwargs['partition']}")
         python_init = f"source /ubc/cs/research/fwood/vadmas/miniconda3/bin/activate {kwargs['env']}"
@@ -204,7 +219,7 @@ def make_bash_script(python_command, file_name, job_dir, **kwargs):
 def add_slurm_option(myfile, option):
     return myfile.replace("\n\n",f"\n\n{option}\n", 1) # set maxreplace = 1 to only replace first occurance
 
-def make_commands(hyper_string, experiment_name, job_idx, file_storage_observer):
+def make_commands(hyper_string, experiment_name, job_idx):
     job_dir = Path(EXPERIMENT_DIR) / Path(RESULTS_DIR) / f"job_{job_idx}"
     job_dir.mkdir(exist_ok=False, parents=True)
 
@@ -217,10 +232,12 @@ def make_commands(hyper_string, experiment_name, job_idx, file_storage_observer)
         src.mkdir(exist_ok=True, parents=True)
         os.symlink(src, artifact_dir, target_is_directory=True)
 
-    python_command = f"python $HOME_DIR/{SRC_PATH} with home_dir=$HOME_DIR artifact_dir=$JOB_DIR/artifacts {hyper_string} -p --name {experiment_name}"
+    python = static.SINGULARITY_COMMAND if SINGULARITY else 'python'
 
-    if file_storage_observer or (HOST == static.CC):
-        python_command = f"{python_command} -F $JOB_DIR/file_storage_observer"
+    if ARGSPARSE:
+        python_command = f"{python} $HOME_DIR/{SRC_PATH} {hyper_string}"
+    else:
+        python_command = f"{python} $HOME_DIR/{SRC_PATH} with home_dir=$HOME_DIR artifact_dir=$JOB_DIR/artifacts {hyper_string} -p --name {experiment_name}"
 
     args_file_name = job_dir / "args.txt"
     res_name = job_dir / 'results.res'

@@ -1,8 +1,8 @@
 UBC = 'ubc'
 CC  = 'cc'
 SUBMISSION_FILE_NAME = 'train.sh'
+SINGULARITY_COMMAND='singularity exec --nv -B $(pwd) --pwd $(pwd) /ubc/cs/research/fwood/vadmas/containers/driving.sif python'
 SLURM_TEMPLATE = f'''#!/bin/bash
-
 
 # ---------------------------------------------------------------------
 echo "Current working directory: `pwd`"
