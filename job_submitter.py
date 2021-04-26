@@ -233,15 +233,16 @@ def make_commands(hyper_string, experiment_name, job_idx):
         os.symlink(src, artifact_dir, target_is_directory=True)
 
     python = static.SINGULARITY_COMMAND if SINGULARITY else 'python'
+    src = SRC_PATH if SINGULARITY else f"$HOME_DIR/{SRC_PATH}"
 
     if ARGSPARSE:
-        python_command = f"{python} $HOME_DIR/{SRC_PATH} {hyper_string}"
+        python_command = f"{python} {src} {hyper_string}"
     else:
-        python_command = f"{python} $HOME_DIR/{SRC_PATH} with home_dir=$HOME_DIR artifact_dir=$JOB_DIR/artifacts {hyper_string} -p --name {experiment_name}"
+        python_command = f"{python} {src} with home_dir=$HOME_DIR artifact_dir=$JOB_DIR/artifacts {hyper_string} -p --name {experiment_name}"
 
     args_file_name = job_dir / "args.txt"
-    res_name = job_dir / 'results.res'
-    err_name = job_dir / 'error.err'
+    res_name       = job_dir / 'results.res'
+    err_name       = job_dir / 'error.err'
 
     with open(args_file_name, 'w') as rsh:
         rsh.write(hyper_string.replace("' '", "'\n'"))

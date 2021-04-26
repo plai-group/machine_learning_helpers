@@ -1,7 +1,7 @@
 UBC = 'ubc'
 CC  = 'cc'
 SUBMISSION_FILE_NAME = 'train.sh'
-SINGULARITY_COMMAND='singularity exec --nv -B $(pwd) --pwd $(pwd) /ubc/cs/research/fwood/vadmas/containers/driving.sif python'
+SINGULARITY_COMMAND='singularity exec --nv -B $HOME_DIR --pwd $HOME_DIR /ubc/cs/research/fwood/vadmas/containers/driving.sif python'
 SLURM_TEMPLATE = f'''#!/bin/bash
 
 # ---------------------------------------------------------------------
