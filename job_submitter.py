@@ -23,6 +23,7 @@ UBC_PLAI_SCRATCH_ARTIFACTS = "/ubc/cs/research/plai-scratch/vadmas/artifacts"
 hostname = socket.gethostname()
 
 # find host and scheduler
+# HOST      = static.CC
 if hostname in COMPUTE_CANADA_HOSTS:
     HOST      = static.CC
 elif hostname in UBC_SLURM_HOSTS:
@@ -205,8 +206,10 @@ def make_bash_script(python_command, file_name, job_dir, **kwargs):
         myfile = add_slurm_option(myfile, f"#SBATCH --account={kwargs['account']}")
         python_init = Template(static.CC_PYTHON_INIT_TOKEN).safe_substitute(pip_install=static.CC_PIP_INSTALLS[kwargs['env']])
 
+    python_init  = "" if SINGULARITY else python_init
+
     myfile = Template(myfile).safe_substitute(
-        init= python_init,
+        init=python_init,
         python_command=python_command,
         home_dir=PROJECT_DIR,
         job_dir=job_dir
@@ -232,7 +235,7 @@ def make_commands(hyper_string, experiment_name, job_idx):
         src.mkdir(exist_ok=True, parents=True)
         os.symlink(src, artifact_dir, target_is_directory=True)
 
-    python = static.SINGULARITY_COMMAND if SINGULARITY else 'python'
+    python = static.SINGULARITY_COMMAND[HOST] if SINGULARITY else 'python'
     src = SRC_PATH if SINGULARITY else f"$HOME_DIR/{SRC_PATH}"
 
     if ARGSPARSE:
@@ -250,3 +253,57 @@ def make_commands(hyper_string, experiment_name, job_idx):
     scheduler_command = f"sbatch -o {res_name} -e {err_name} -J {experiment_name} --export=ALL {static.SUBMISSION_FILE_NAME}"
 
     return scheduler_command, python_command, job_dir
+
+
+# if __name__ == "__main__":
+#     from pathlib import Path
+
+#     project_path = Path(".").cwd()
+
+
+#     job_options = {
+#         "gpu": True,
+#         "hrs": 1,
+#         "cpu": 16,
+#         "mem": "12400M",
+#         "partition": 'plai',
+#         "env": 'ml3',
+#         'account':'rrg-kevinlb'
+#     }
+
+#     default_args = {
+#         "seed"          : 1,
+#         "batch_size"    : 2,
+#         "S"             : 5,
+#         "learning_rate" : 0.0003,
+#         "model_type"    : "bicycle",
+#         "mon_trials"    : 10,
+#         "num_birdviews" : 1,
+#         "num_epochs"    : 1000,
+#         "num_rnn_layers": 2,
+#         "test_interval" : 200,
+#         "val_keeponly"  : 100,
+#         "z_dim"         : 2,
+#         "scene_name"    : "DR_DEU_Merging_MT",
+#                                                                 }
+
+#     elbo_args = {"latent_loss": ['kl-sample','kl-analytic']}
+
+
+#     tvo_args = {
+#             "latent_loss": ['tvo_no_encoder'],
+#                 "K": [2,10,50],
+#                 }
+
+
+#     submit([{**default_args, **elbo_args},
+#             {**default_args, **tvo_args}],
+#             "tvo_dual_loss_debug",
+#             project_path,
+#             argsparse=True,
+#             singularity=True,
+#             script_name='train.py',
+#             singularity_path='/home/vadmas/scratch/dev/containers/driving.sif',
+#             **job_options)
+
+

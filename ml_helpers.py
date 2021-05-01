@@ -537,6 +537,13 @@ def detect_cuda(args):
     return args
 
 
+def log_sum_weighted_exp(val1, val2, weight1, weight2):
+    val_max = np.where(val1 > val2, val1, val2)
+    val1_exp = weight1 * np.exp(val1 - val_max)
+    val2_exp = weight2 * np.exp(val2 - val_max)
+    lse = val_max + np.log(val1_exp + val2_exp)
+    return lse
+
 def logaddexp(a, b):
     """Returns log(exp(a) + exp(b))."""
 
@@ -620,6 +627,37 @@ def ESS(x):
         t += 1
 
     return int(m_chains*n_iters / (1 + 2*rho[1:t].sum()))
+
+
+def ci(a, which=95, axis=None):
+    """Return a percentile range from an array of values."""
+    p = 50 - which / 2, 50 + which / 2
+    return np.nanpercentile(a, p, axis)
+
+
+def ESSl(lw):
+    """ESS (Effective sample size) computed from log-weights.
+
+    Parameters
+    ----------
+    lw: (N,) ndarray
+        log-weights
+
+    Returns
+    -------
+    float
+        the ESS of weights w = exp(lw), i.e. the quantity
+        sum(w**2) / (sum(w))**2
+
+    Note
+    ----
+    The ESS is a popular criterion to determine how *uneven* are the weights.
+    Its value is in the range [1, N], it equals N when weights are constant,
+    and 1 if all weights but one are zero.
+
+    """
+    w = np.exp(lw - lw.max())
+    return (w.sum())**2 / np.sum(w**2)
 
 def gelman_rubin(x):
     """ Estimate the marginal posterior variance. Vectorised implementation. """
