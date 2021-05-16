@@ -173,8 +173,12 @@ def make_hyper_string_from_dict(hyper_dict, df):
     for args in itertools.product(*hyper_dict.values()):
         header = list(zip(hyper_dict.keys(), args))
         if verify_header(header, df):
-
             command = "".join([connect_string.format(k, v) for k, v in header])
+
+            # temporary hack to replace '--hyper=None' w/ '--hyper'
+            if ARGSPARSE:
+                command = command.replace("=None","")
+
             commands.append(command[:-1])
         else:
             print(f"skipping: {header}")
