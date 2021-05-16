@@ -236,7 +236,9 @@ def make_commands(hyper_string, experiment_name, job_idx):
         os.symlink(src, artifact_dir, target_is_directory=True)
 
     python = static.SINGULARITY_COMMAND[HOST] if SINGULARITY else 'python'
-    src = SRC_PATH if SINGULARITY else f"$HOME_DIR/{SRC_PATH}"
+    #src = SRC_PATH if SINGULARITY else f"$HOME_DIR/{SRC_PATH}"
+    src = f"$HOME_DIR/{SRC_PATH}"
+
 
     if ARGSPARSE:
         python_command = f"{python} {src} {hyper_string}"
