@@ -239,10 +239,13 @@ def make_commands(hyper_string, experiment_name, job_idx):
         src.mkdir(exist_ok=True, parents=True)
         os.symlink(src, artifact_dir, target_is_directory=True)
 
-    python = static.SINGULARITY_COMMAND[HOST] if SINGULARITY else 'python'
-    #src = SRC_PATH if SINGULARITY else f"$HOME_DIR/{SRC_PATH}"
-    src = f"$HOME_DIR/{SRC_PATH}"
 
+    if SINGULARITY:
+        python = Template(static.SINGULARITY_COMMAND[HOST]).safe_substitute(container=SINGULARITY)
+    else:
+        python = 'python'
+
+    src = SRC_PATH if SINGULARITY else f"$HOME_DIR/{SRC_PATH}"
 
     if ARGSPARSE:
         python_command = f"{python} {src} {hyper_string}"
@@ -259,7 +262,6 @@ def make_commands(hyper_string, experiment_name, job_idx):
     scheduler_command = f"sbatch -o {res_name} -e {err_name} -J {experiment_name} --export=ALL {static.SUBMISSION_FILE_NAME}"
 
     return scheduler_command, python_command, job_dir
-
 
 # if __name__ == "__main__":
 #     from pathlib import Path
