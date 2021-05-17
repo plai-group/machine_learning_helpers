@@ -2,8 +2,8 @@ UBC = 'ubc'
 CC  = 'cc'
 SUBMISSION_FILE_NAME = 'train.sh'
 SINGULARITY_COMMAND = {
-    'ubc': 'singularity exec --nv -B $HOME_DIR --pwd $HOME_DIR /ubc/cs/research/fwood/vadmas/containers/driving.sif python',
-    'cc': 'singularity exec --env REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt --nv -B /home -B /project -B /scratch -B /localscratch /home/vadmas/scratch/dev/containers/driving.sif python'
+    'ubc': 'singularity exec --nv -B $HOME_DIR --pwd $HOME_DIR $container python',
+    'cc': 'singularity exec --env REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt --nv -B /home -B /project -B /scratch -B /localscratch $container python'
     }
 
 
