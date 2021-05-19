@@ -22,24 +22,7 @@ from sklearn import metrics
 from torch._six import inf
 from parallel import pmap, pmap_df
 
-PRUNE_COLUMNS = [
-    '__doc__',
-    'checkpoint',
-    'meta',
-    'resources',
-    'checkpoint_frequency',
-    'cuda',
-    'heartbeat',
-    'verbose',
-    'command',
-    'data_dir',
-    'experiment',
-    'artifact_dir',
-    'artifacts',
-]
-
 persist_dir = Path('./.persistdir')
-
 
 def nested_dict():
     return defaultdict(nested_dict)
@@ -404,6 +387,12 @@ class BestMeter(object):
         self.mode = mode
 
 
+"""
+Misc helper functions
+"""
+
+def nested_dict():
+    return defaultdict(nested_dict)
 
 def warmup_lr_scheduler(optimizer, warmup_iters, warmup_factor):
     def f(x):
@@ -505,6 +494,10 @@ def train_test_val(data, splits=(0.7,0.2,0.1)):
 def group_train_test_val(data: pd.DataFrame, group: str, **kwargs):
     groups = data[group]
     return [data[groups.isin(split)] for split in train_test_val(groups.unique(), **kwargs)]
+
+
+
+persist_dir = Path('./.persistdir')
 
 
 def put(value, filename):
