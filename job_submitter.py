@@ -245,7 +245,7 @@ def make_commands(hyper_string, experiment_name, job_idx):
     else:
         python = 'python'
 
-    src = SRC_PATH if SINGULARITY else f"$HOME_DIR/{SRC_PATH}"
+    src = f"$HOME_DIR/{SRC_PATH}"
 
     if ARGSPARSE:
         python_command = f"{python} {src} {hyper_string}"
