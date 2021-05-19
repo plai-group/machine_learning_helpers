@@ -8,15 +8,15 @@ For notebooks, store your boilerplate code in `init.ipynb` and run
 
 `%run ~/.python/init` at the beginning of each new notebook.
 
-Then you can use `import ml_helpers as mlh` in all your projects. For notebooks, store your boilerplate code in `init.ipynb` and run `%run ~/.python/init` at the beginning of each new notebook.
+Then you can use `import ml_helpers as mlh` in all your projects.
 
 ---
 
 # Job submission script instructions
 
-These scripts are highly opinionated, meaning they enforce a strict directory structure and are only set up to work with my machine learning project skeleton. That said they should be easy to modify for your own use.
+These scripts are highly opinionated, meaning they enforce a strict directory structure and are only set up to work with my machine learning project skeleton. That said, they should be easy to modify for your own use.
 
-## If you want to use my project template
+## If you want to use the project template + job submission script
 
 Submissions happen entirely though python. See `submit.py` for an example. User imports specifies a dictionary of job options and a dictionary of hyperparameters, and calls `submit()` from `job_submitter.py`. A few comments:
 
@@ -32,9 +32,9 @@ then you can use `import job_submitter` in all your projects. Super handy to pre
 ## If you want to modify the scripts for your own project
 
 The logic of `job_submitter.py` is broken into a few components, each of which should be easily modifiable for your own purposes:
-1. Validate directory structure.
+1. First it validates directory structure.
    - `verify_dirs()` checks the required path exists, and loads global parameters to avoid passing paths around everywhere. Also creates a unique timestamped results directory within the experiments folder.
-2. Process hyperparameters
+2. Then process hyperparameters
    - This expects a dictionary (or a list of dictionaries) in the format
         ```python
         my_hypers = {
@@ -54,7 +54,7 @@ The logic of `job_submitter.py` is broken into a few components, each of which s
         ]
         ```
         note the extra single-quotes within the string. This is tailored for sacred's command line interface. **Modify line 157 for a different string format.**
-  3. Iterate through each hyperparameter string and ask the user if they want to submit the job. The purpose of this is that the first submission will invariably fail for some reason or another. Submit a test job, wait to see that it runs correctly, then submit the rest.
+  3. Next, iterate through each hyperparameter string and ask the user if they want to submit the job. The purpose of this is that the first submission will invariably fail for some reason or another. Submit a test job, wait to see that it runs correctly, then submit the rest.
   4. When a user submits a job, two command line string are made in `make_commands()`. The first turns the hyperparameter string into a sacred-specific python command, which looks something like
        ```python
         python_command = "python main.py with 'lr=0.001' 'seed=1' 'other_hyper=cat' "
