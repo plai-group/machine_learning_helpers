@@ -1,8 +1,13 @@
 UBC = 'ubc'
 CC  = 'cc'
 SUBMISSION_FILE_NAME = 'train.sh'
-SLURM_TEMPLATE = f'''#!/bin/bash
+SINGULARITY_COMMAND = {
+    'ubc': 'singularity exec --nv -B $HOME_DIR --pwd $HOME_DIR $container python',
+    'cc': 'singularity exec --env REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt --nv -B /home -B /project -B /scratch -B /localscratch $container python'
+    }
 
+
+SLURM_TEMPLATE = f'''#!/bin/bash
 
 # ---------------------------------------------------------------------
 echo "Current working directory: `pwd`"
