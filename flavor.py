@@ -59,11 +59,44 @@ def expand_list_column(df, column_name, output_column_names):
     #     1       1           2         3
     #     2       1           2         3
     """
+    return (df
+            .drop(column_name, 1)
+            .join(pd.DataFrame(df[column_name].values.tolist(),
+                               index=df.index,
+                               columns=output_column_names)))
 
-    new = pd.DataFrame(df[column_name].values.tolist(), index=df.index, columns=output_column_names)
-    old = df.drop(column_name, 1)
-    return old.merge(new, left_index=True, right_index=True)
 
+@pf.register_dataframe_method
+def get_nth_element(df, column_name, n, new_column_name, in_place=False):
+    """
+
+    #     AMOUNT    column_name
+    #     0       [1,2,3]
+    #     1       [1,2,3]
+    #     2       [1,2,3]
+
+    to (N=1)
+
+    #     AMOUNT  column_name     new_column_name
+    #     0       1           2
+    #     1       1           2
+    #     2       1           2
+    """
+
+    df[new_column_name] = df[column_name].str[n]
+    if in_place:
+        return df.drop(column_name, 1)
+    else:
+        return df
+
+@pf.register_dataframe_method
+def process_dictionary_column(df, column_name):
+    if column_name in df.columns:
+        return (df
+                .join(df[column_name].apply(pd.Series))
+                .drop(column_name, 1))
+    else:
+        return df
 
 # collapse_levels(sep='_')
 # @pf.register_dataframe_method

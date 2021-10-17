@@ -4,6 +4,7 @@
 logs/*
 notebooks/.ipynb_checkpoints/
 archive/
+job_submitter_debug.py
 discrete_vi/
 bkup/
 results/
