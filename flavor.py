@@ -89,6 +89,14 @@ def get_nth_element(df, column_name, n, new_column_name, in_place=False):
     else:
         return df
 
+@pf.register_dataframe_method
+def process_dictionary_column(df, column_name):
+    if column_name in df.columns:
+        return (df
+                .join(df[column_name].apply(pd.Series))
+                .drop(column_name, 1))
+    else:
+        return df
 
 # collapse_levels(sep='_')
 # @pf.register_dataframe_method
