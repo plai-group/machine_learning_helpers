@@ -772,6 +772,15 @@ def get_all_dirs(path):
     return [p for p in Path(path).glob("*") if p.is_dir()]
 
 
+def timeit(method):
+    def timed(*args, **kw):
+        ts = time.time()
+        result = method(*args, **kw)
+        te = time.time()
+        print(f'{method.__name__}:  {te - ts} s')
+        return result
+    return timed
+
 def get_frequency(y):
     y = np.bincount(y)
     ii = np.nonzero(y)[0]
