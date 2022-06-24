@@ -1,5 +1,7 @@
-UBC = 'ubc'
-CC  = 'cc'
+UBC       = 'ubc'
+SUBMIT_ML = 'submit_ml'
+CC        = 'cc'
+
 SUBMISSION_FILE_NAME = 'train.sh'
 SINGULARITY_COMMAND = {
     'ubc': 'singularity exec --nv -B /ubc/cs/research/fwood/vadmas/ -B $HOME_DIR --pwd $HOME_DIR $container python',

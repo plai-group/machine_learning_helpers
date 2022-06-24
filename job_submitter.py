@@ -18,6 +18,7 @@ import uuid
 # Global Arguments
 COMPUTE_CANADA_HOSTS = ['cedar{}.cedar.computecanada.ca'.format(i) for i in range(10)]
 UBC_SLURM_HOSTS = ['borg.cs.ubc.ca']
+UBC_SUBMIT_ML = ['submit-ml']
 UBC_PLAI_SCRATCH_ARTIFACTS = "/ubc/cs/research/plai-scratch/vadmas/artifacts"
 
 hostname = socket.gethostname()
@@ -28,6 +29,8 @@ if hostname in COMPUTE_CANADA_HOSTS:
     HOST      = static.CC
 elif hostname in UBC_SLURM_HOSTS:
     HOST      = static.UBC
+elif hostname in UBC_SUBMIT_ML:
+    HOST      = static.SUBMIT_ML
 else:
     raise ValueError("Scheduler not detected")
 
@@ -113,7 +116,7 @@ def verify_dirs(experiment_dir, experiment_name, script_name, argsparse, singula
     data_dir       = Path(project_dir) / 'data'
 
     assert project_dir.is_dir(), "{} does not exist".format(project_dir)
-    assert data_dir.is_dir(), "{} does not exist".format(data_dir)
+    # assert data_dir.is_dir(), "{} does not exist".format(data_dir)
     assert src_path.is_file(), "{} does not exist".format(src_path)
 
     now = datetime.datetime.now()
@@ -205,6 +208,10 @@ def make_bash_script(python_command, file_name, job_dir, **kwargs):
     # ugly, fix later
     if HOST == static.UBC:
         myfile = add_slurm_option(myfile, f"#SBATCH --partition={kwargs['partition']}")
+        python_init = f"source /ubc/cs/research/fwood/vadmas/miniconda3/bin/activate {kwargs['env']}"
+    elif HOST == static.SUBMIT_ML:
+        myfile = add_slurm_option(myfile, f"#SBATCH --partition={kwargs['partition']}")
+        myfile = add_slurm_option(myfile, f"#SBATCH --account={kwargs['account']}")
         python_init = f"source /ubc/cs/research/fwood/vadmas/miniconda3/bin/activate {kwargs['env']}"
     else:
         myfile = add_slurm_option(myfile, f"#SBATCH --account={kwargs['account']}")
