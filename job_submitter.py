@@ -41,7 +41,7 @@ RESULTS_DIR    = ""
 ARGSPARSE      = False
 SINGULARITY    = False
 
-SLEEP_TIME = 0.05
+SLEEP_TIME = 1.05
 
 REQUIRED_OPTIONS = set(["gpu", "hrs", "cpu", "mem", "partition", "env"])
 
