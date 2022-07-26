@@ -146,6 +146,7 @@ def process_dictionary_column(df, column_name):
 #     df = df.dropna(1, how='all')
 #     return df[[i for i in df if len(set(df[i])) > 1]]
 
+@pf.register_dataframe_method
 def pgroupby(df, groups, f,  **kwargs):
     '''# mirror groupby order (group then agg)
     replace:
