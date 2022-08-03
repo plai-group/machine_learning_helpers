@@ -26,6 +26,11 @@ def add_outer_index(df, value, name):
     return pd.concat({value: df}, names=[name])
 
 @pf.register_dataframe_method
+def add_outer_column(df, value):
+    df.columns = pd.MultiIndex.from_arrays([[value]*len(df.columns), df.columns])
+    return df
+
+@pf.register_dataframe_method
 def ppipe(df, f, **kwargs):
     return pmap_df(f, df, **kwargs)
 
