@@ -235,3 +235,12 @@ def str_slice(
 
     df[column_name] = df[column_name].str[start:stop]
     return df
+
+
+@pf.register_dataframe_method
+def pipeprint(df, msg, **kwargs):
+    """
+    print statements in a pandas pipe
+    """
+    print(msg)
+    return df
