@@ -66,7 +66,7 @@ def run_async(func):
         queue.put(result)
         print(f'Took {total_time:.4f} seconds')
     def wrapper(*args, **kwargs):
-        queue = multiprocessing.Queue()
+        queue = multiprocessing.Manager().Queue()
         process = multiprocessing.Process(target=func_with_queue, args=(queue,*args), kwargs=kwargs)
         process.start()
         return queue
