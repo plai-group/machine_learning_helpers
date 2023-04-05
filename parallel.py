@@ -1,12 +1,14 @@
+
 import contextlib
 import joblib
 import numpy as np
 import pandas as pd
 import janitor
+import multiprocessing
 from tqdm.auto import tqdm
 from joblib import Parallel, delayed
 from sklearn.model_selection import GroupKFold
-
+import time
 
 @contextlib.contextmanager
 def tqdm_joblib(tqdm_object):
@@ -42,3 +44,29 @@ def pmap_df(f, df, n_chunks = 100, groups=None, axis=0, **kwargs):
         df_split = np.array_split(df, n_chunks)
     df = pd.concat(pmap(f, df_split, **kwargs), axis=axis)
     return df
+
+# For long running jupyter cells
+def run_async(func):
+    """
+    # example
+    # @run_async
+    # def long_run(idx, val='cat'):
+    #     for i in range(idx):
+    #         print(i)
+    #         time.sleep(1)
+    #     return val
+
+    """
+    def func_with_queue(queue, *args, **kwargs):
+        start_time = time.perf_counter()
+        result = func(*args, **kwargs)
+        end_time = time.perf_counter()
+        total_time = end_time - start_time
+        queue.put(result)
+        print(f'Function {func.__name__}{args} {kwargs} Took {total_time:.4f} seconds')
+    def wrapper(*args, **kwargs):
+        queue = multiprocessing.Queue()
+        process = multiprocessing.Process(target=func_with_queue, args=(queue,*args), kwargs=kwargs)
+        process.start()
+        return queue
+    return wrapper
