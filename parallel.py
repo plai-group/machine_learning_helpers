@@ -38,6 +38,7 @@ def pmap(f, arr, n_jobs=-1, **kwargs):
 def pmap_df(f, df, n_chunks = 100, groups=None, axis=0, **kwargs):
     # https://towardsdatascience.com/make-your-own-super-pandas-using-multiproc-1c04f41944a1
     if groups:
+        n_chunks = min(n_chunks, df[groups].nunique())
         group_kfold = GroupKFold(n_splits=n_chunks)
         df_split = [df.iloc[test_index]  for _, test_index in group_kfold.split(df, groups=df[groups])]
     else:
