@@ -2,6 +2,11 @@ import pandas as pd
 from parallel import pmap, pmap_df
 import pandas_flavor as pf
 import numpy as np
+import polars as pl
+
+@pf.register_dataframe_method
+def to_polars(df, **kwargs):
+    return pl.from_pandas(df, **kwargs)
 
 @pf.register_dataframe_method
 def highlight_best(df,
