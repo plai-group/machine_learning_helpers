@@ -496,8 +496,14 @@ def group_train_test_val(data: pd.DataFrame, group: str, **kwargs):
     return [data[groups.isin(split)] for split in train_test_val(groups.unique(), **kwargs)]
 
 
-
-persist_dir = Path('./.persistdir')
+def human_format(num, precision=5):
+    s = "{:."+ str(precision) + "g}"
+    num = float(s.format(num))
+    magnitude = 0
+    while abs(num) >= 1000:
+        magnitude += 1
+        num /= 1000.0
+    return '{}{}'.format('{:f}'.format(num).rstrip('0').rstrip('.'), ['', 'K', 'M', 'B', 'T'][magnitude])
 
 
 def put(value, filename):
