@@ -19,7 +19,7 @@ import pandas as pd
 import torch
 
 from sklearn import metrics
-from torch._six import inf
+from torch import inf
 from parallel import pmap, pmap_df
 
 persist_dir = Path('./.persistdir')
